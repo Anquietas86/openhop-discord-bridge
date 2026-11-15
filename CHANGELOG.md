@@ -1,3 +1,23 @@
+# 0.8.3 — documentation for public users
+
+The project was announced in the SA Mesh Users Discord, so the README matters as
+much as the code from here.
+
+- **The README's install and configuration sections were duplicated five times.**
+  `scripts/gen_config_table.py` located `## Configuration` and `## Discord setup`
+  independently; because Discord setup appears first in the document,
+  `text[end:]` re-included everything after it and every run appended another copy
+  of the whole block. A 990-line README became 309 lines, and the generator is now
+  marker-based and idempotent. `tests/test_docs_idempotent.py` fails if a repeat run
+  changes the file, or if any section appears more than once.
+- **Adds a Troubleshooting section** built from failures that actually occurred:
+  the Message Content Intent exit code, an openHop API key pasted where a bot token
+  belongs, 403 on autoprovision, edits that need a disable/enable, transmit gated
+  three ways, stale role ids, companion reconnects, WAL needing directory write
+  access, snowflake precision, and webhook name rejections.
+- **Adds `examples/config.example.json`**, which validates against the loader
+  as-is once the token and channel ids are filled in.
+
 # 0.8.2 — close the last two review items
 
 - **TX silently used the first channel secret.** Receive tries every candidate

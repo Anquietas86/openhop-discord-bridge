@@ -1,0 +1,28 @@
+{
+  "discord_token": "",
+  "companion_host": "127.0.0.1",
+  "companion_port": 5003,
+  "companion_node_name": "Discord Bridge",
+  "repeater_db_path": "/var/lib/openhop_repeater/repeater.db",
+  "discord_autoprovision": true,
+  "discord_category_name": "💬 | Meshcore",
+  "discord_sender_name": "display_name",
+  "escape_markdown": true,
+  "mesh_sender_marker": "",
+  "tx_retries": 3,
+  "channels": [
+    {
+      "mesh_channel": "Public",
+      "discord_channel_id": "",
+      "mesh_to_discord": true,
+      "discord_to_mesh": false
+    },
+    {
+      "mesh_channel": "Adelaide Chat",
+      "discord_channel_id": "",
+      "mesh_to_discord": true,
+      "discord_to_mesh": true,
+      "allowed_role_ids": []
+    }
+  ]
+}
