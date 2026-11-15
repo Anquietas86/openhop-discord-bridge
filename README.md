@@ -139,6 +139,7 @@ from `DISCORD_BOT_TOKEN`, which keeps it out of any file you might share.
 | `allowed_user_ids` | list[string] | no | Who may transmit. **Empty means nobody** — enabling `discord_to_mesh` alone transmits nothing. |
 | `allowed_role_ids` | list[string] | no | Role-based alternative to naming users. |
 | `prefix_template` | string | no | Per-channel label template overriding `mesh_prefix_template`. |
+| `sender_name` | string | no | Per-channel override of `discord_sender_name` (`display_name`, `username`, `none`). `discord_sender_name` is accepted as an alias. |
 
 > **Quote every id.** Discord snowflakes are ~1.57e18 and exceed float64
 > precision. An openHop settings save round-trips this JSON through JavaScript,

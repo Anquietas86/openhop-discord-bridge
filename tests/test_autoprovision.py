@@ -135,3 +135,32 @@ def test_discord_channel_names_keep_emoji(raw, expected):
     name intact, so a mesh channel named with an emoji can keep it.
     """
     assert normalise_channel_name(raw) == expected
+
+
+def test_per_channel_sender_name_override(tmp_path):
+    """A channel may differ from the global default (e.g. none on one channel)."""
+    path = cfg_file(
+        tmp_path,
+        discord_autoprovision=True,
+        discord_sender_name="username",
+        channels=[
+            {"mesh_channel": "Public"},
+            {"mesh_channel": "#test", "sender_name": "none"},
+            {"mesh_channel": "SARG", "discord_sender_name": "display_name"},
+        ],
+    )
+    cfg = load_config(path)
+    assert cfg.discord_sender_name == "username"
+    by_mesh = {m.mesh_channel: m.sender_name for m in cfg.channels}
+    assert by_mesh == {"Public": None, "#test": "none", "SARG": "display_name"}
+
+
+def test_per_channel_sender_name_validated(tmp_path):
+    path = cfg_file(
+        tmp_path,
+        discord_autoprovision=True,
+        channels=[{"mesh_channel": "Public", "sender_name": "nickname"}],
+    )
+    with pytest.raises(ConfigError) as exc:
+        load_config(path)
+    assert "sender_name" in str(exc.value)

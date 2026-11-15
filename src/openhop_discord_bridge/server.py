@@ -309,7 +309,7 @@ class Bridge:
         label = mesh_sender_label(
             message.author.display_name,
             getattr(message.author, "name", ""),
-            self.config.discord_sender_name,
+            mapping.sender_name or self.config.discord_sender_name,
             self.config.discord_sender_name_max_chars,
         )
         # With discord_sender_name=none there is no speaker label: send the body

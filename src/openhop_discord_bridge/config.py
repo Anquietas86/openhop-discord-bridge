@@ -40,6 +40,23 @@ MANIFEST_DEFAULTS: Dict[str, Any] = {
 }
 
 
+SENDER_MODES = ("display_name", "username", "none")
+
+
+def _sender_mode(value) -> Optional[str]:
+    """Validate a sender-label mode, or None when unset."""
+    if value is None or value == "":
+        return None
+    mode = str(value).lower()
+    if mode not in SENDER_MODES:
+        raise ConfigError(
+            "sender_name must be one of "
+            + ", ".join(repr(m) for m in SENDER_MODES)
+            + f", not {mode!r}"
+        )
+    return mode
+
+
 def normalise_channel_name(name: str) -> str:
     """Discord channel name for a mesh channel: lowercase, spaces to dashes.
 
@@ -86,6 +103,7 @@ class ChannelMapping:
     allowed_user_ids: List[int] = field(default_factory=list)
     prefix_template: Optional[str] = None
     discord_channel_name: Optional[str] = None
+    sender_name: Optional[str] = None
 
     @classmethod
     def from_dict(cls, raw: Dict[str, Any]) -> "ChannelMapping":
@@ -115,6 +133,7 @@ class ChannelMapping:
             allowed_user_ids=[int(x) for x in raw.get("allowed_user_ids") or []],
             prefix_template=raw.get("prefix_template"),
             discord_channel_name=raw.get("discord_channel_name"),
+            sender_name=_sender_mode(raw.get("sender_name") or raw.get("discord_sender_name")),
         )
 
     def resolved_channel_name(self, prefix: str = "") -> str:
@@ -247,12 +266,7 @@ def load_config(path: Optional[Path] = None) -> Config:
             seen_discord.add(m.discord_channel_id)
         seen_mesh.add(m.mesh_channel)
 
-    sender_mode = str(raw.get("discord_sender_name") or "display_name").lower()
-    if sender_mode not in ("display_name", "username", "none"):
-        raise ConfigError(
-            "discord_sender_name must be 'display_name', 'username' or 'none', "
-            f"not {sender_mode!r}"
-        )
+    sender_mode = _sender_mode(raw.get("discord_sender_name") or "display_name") or "display_name"
 
     max_bytes = int(raw.get("max_mesh_bytes") or 128)
     if not 16 <= max_bytes <= 200:

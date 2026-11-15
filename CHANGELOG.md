@@ -1,3 +1,14 @@
+# 0.6.0
+
+- **Per-channel `sender_name`**: a mapping may override `discord_sender_name`
+  (`display_name`, `username`, `none`) so one channel can send bare while others
+  name the speaker. `discord_sender_name` is accepted as an alias inside a
+  mapping. Unset means "use the global default".
+- Both levels share one validator, so an invalid mode fails at startup with the
+  legal values listed.
+- README config tables regenerated (23 fields, 9 mapping keys).
+- 78 tests passing.
+
 # 0.5.0
 
 - **`discord_sender_name: "none"`** — a third option alongside `display_name` and

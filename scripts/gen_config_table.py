@@ -119,6 +119,7 @@ MAPPING_DOCS = [
     ("allowed_user_ids", "list[string]", "no", "Who may transmit. **Empty means nobody** — enabling `discord_to_mesh` alone transmits nothing."),
     ("allowed_role_ids", "list[string]", "no", "Role-based alternative to naming users."),
     ("prefix_template", "string", "no", "Per-channel label template overriding `mesh_prefix_template`."),
+    ("sender_name", "string", "no", "Per-channel override of `discord_sender_name` (`display_name`, `username`, `none`). `discord_sender_name` is accepted as an alias."),
 ]
 
 missing = [k for k in manifest if k not in DOCS]

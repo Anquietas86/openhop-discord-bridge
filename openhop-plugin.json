@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "discord.bridge",
   "name": "Discord Bridge",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Two-way bridge between MeshCore channels and Discord channels, using a dedicated companion identity on its own TCP port.",
   "runtime": {
     "type": "python",
