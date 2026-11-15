@@ -24,6 +24,8 @@ MANIFEST_DEFAULTS: Dict[str, Any] = {
     "link_check_seconds": 15.0,
     "max_mesh_bytes": 128,
     "mesh_prefix_template": "{author}: ",
+    "discord_sender_name": "display_name",
+    "discord_sender_name_max_chars": 24,
     "companion_node_name": "Discord Bridge",
     "webhook_name": "Mesh Bridge",
     "rate_capacity": 3,
@@ -125,6 +127,8 @@ class Config:
     link_check_seconds: float
     max_mesh_bytes: int
     mesh_prefix_template: str
+    discord_sender_name: str
+    discord_sender_name_max_chars: int
     companion_node_name: str
     webhook_name: str
     rate_capacity: int
@@ -224,6 +228,13 @@ def load_config(path: Optional[Path] = None) -> Config:
             seen_discord.add(m.discord_channel_id)
         seen_mesh.add(m.mesh_channel)
 
+    sender_mode = str(raw.get("discord_sender_name") or "display_name").lower()
+    if sender_mode not in ("display_name", "username"):
+        raise ConfigError(
+            "discord_sender_name must be 'display_name' or 'username', "
+            f"not {sender_mode!r}"
+        )
+
     max_bytes = int(raw.get("max_mesh_bytes") or 128)
     if not 16 <= max_bytes <= 200:
         raise ConfigError("max_mesh_bytes must be between 16 and 200")
@@ -241,6 +252,8 @@ def load_config(path: Optional[Path] = None) -> Config:
         link_check_seconds=max(5.0, float(raw.get("link_check_seconds") or 15.0)),
         max_mesh_bytes=max_bytes,
         mesh_prefix_template=str(raw.get("mesh_prefix_template") or "{author}: "),
+        discord_sender_name=str(raw.get("discord_sender_name") or "display_name").lower(),
+        discord_sender_name_max_chars=max(4, int(raw.get("discord_sender_name_max_chars") or 24)),
         companion_node_name=str(raw.get("companion_node_name") or "Discord Bridge"),
         webhook_name=str(raw.get("webhook_name") or "Mesh Bridge"),
         rate_capacity=max(1, int(raw.get("rate_capacity") or 3)),

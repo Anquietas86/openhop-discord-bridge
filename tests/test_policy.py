@@ -167,3 +167,21 @@ def test_echo_matches_after_node_name_prefix():
     assert guard.is_echo("Josh Hagger: !test")
     assert guard.is_echo("VK5JPH Discord \U0001f916: Josh Hagger: !test")
     assert not guard.is_echo("Ranga: hello")
+
+
+def test_mesh_sender_label_modes():
+    """display_name = what people see; username = the account handle."""
+    from openhop_discord_bridge.policy import mesh_sender_label as m
+
+    assert m("Josh Hagger", "anquietas86") == "Josh Hagger"
+    assert m("Josh Hagger", "anquietas86", "display_name") == "Josh Hagger"
+    assert m("Josh Hagger", "anquietas86", "username") == "anquietas86"
+    # a missing display name falls back to the handle rather than "None"
+    assert m("", "anquietas86") == "anquietas86"
+    assert m("", "") == "discord"
+
+
+def test_mesh_sender_label_is_capped():
+    from openhop_discord_bridge.policy import mesh_sender_label as m
+
+    assert len(m("A very long display name indeed", "handle", "display_name", 10)) == 10

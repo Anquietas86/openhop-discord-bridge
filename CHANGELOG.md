@@ -1,3 +1,11 @@
+# 0.3.0
+
+- **`discord_sender_name`**: label Discord speakers on the mesh by `display_name`
+  (default, what people see — "Josh Hagger") or `username` (the handle —
+  "anquietas86"). Capped by `discord_sender_name_max_chars` (default 24) because
+  the label spends the mesh byte budget.
+- 64 tests passing.
+
 # 0.2.4
 
 Two bugs found on the first real Discord -> mesh round trip:

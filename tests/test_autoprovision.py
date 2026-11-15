@@ -95,3 +95,24 @@ def test_explicit_ids_still_work_with_autoprovision(tmp_path):
     )
     cfg = load_config(path)
     assert cfg.channels[0].discord_channel_id == 123456789
+
+
+def test_sender_name_mode_validated(tmp_path):
+    path = cfg_file(
+        tmp_path,
+        discord_autoprovision=True,
+        channels=[{"mesh_channel": "Public"}],
+        discord_sender_name="nickname",
+    )
+    with pytest.raises(ConfigError) as exc:
+        load_config(path)
+    assert "display_name" in str(exc.value) and "username" in str(exc.value)
+
+
+def test_sender_name_mode_default_and_override(tmp_path):
+    path = cfg_file(tmp_path, discord_autoprovision=True,
+                    channels=[{"mesh_channel": "Public"}])
+    assert load_config(path).discord_sender_name == "display_name"
+    path2 = cfg_file(tmp_path, discord_autoprovision=True,
+                     channels=[{"mesh_channel": "Public"}], discord_sender_name="username")
+    assert load_config(path2).discord_sender_name == "username"

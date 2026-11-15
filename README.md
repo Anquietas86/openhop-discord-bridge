@@ -88,7 +88,9 @@ repeater database at startup, so only the identity needs creating by hand.
   "companion_port": 5003,
   "repeater_db_path": "/var/lib/openhop_repeater/repeater.db",
   "max_mesh_bytes": 128,
-  "mesh_prefix_template": "[{author}] ",
+  "mesh_prefix_template": "{author}: ",
+  "discord_sender_name": "display_name",
+  "discord_sender_name_max_chars": 24,
   "rate_capacity": 3,
   "rate_refill_seconds": 12.0,
   "echo_ttl_seconds": 120,
@@ -103,6 +105,11 @@ repeater database at startup, so only the identity needs creating by hand.
   ]
 }
 ```
+
+`discord_sender_name` chooses how a Discord speaker is labelled on the mesh:
+`display_name` (the nickname / global display name people see, e.g. "Josh
+Hagger") or `username` (the account handle, e.g. "anquietas86"). The label spends
+the mesh byte budget, so it is capped by `discord_sender_name_max_chars`.
 
 Unmapped channels are ignored in both directions. `mesh_to_discord` and
 `discord_to_mesh` are independent, so a channel can be mirrored read-only.

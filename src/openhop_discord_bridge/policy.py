@@ -74,6 +74,25 @@ def mesh_text_budget(max_bytes: int, node_name: str) -> int:
     return max(16, max_bytes - overhead)
 
 
+SENDER_NAME_MODES = ("display_name", "username")
+
+
+def mesh_sender_label(
+    display_name: str, username: str, mode: str = "display_name", max_len: int = 24
+) -> str:
+    """How a Discord speaker is labelled on the mesh.
+
+    ``display_name`` is the server nickname / global display name people see
+    (e.g. "Josh Hagger"); ``username`` is the account handle (e.g.
+    "anquietas86"). The name spends the mesh byte budget, so it is capped.
+    """
+    chosen = username if (mode or "").lower() == "username" else display_name
+    label = " ".join((chosen or "").split())
+    if not label:
+        label = " ".join((username or "").split()) or "discord"
+    return label[:max_len]
+
+
 def render_prefix(template: str, author: str) -> str:
     try:
         return template.format(author=author)
