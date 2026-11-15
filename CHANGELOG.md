@@ -1,3 +1,15 @@
+# 0.8.2 — close the last two review items
+
+- **TX silently used the first channel secret.** Receive tries every candidate
+  key found in the repeater DB, but transmit used `candidates[0]`. The same
+  channel name exists on several companions; if their keys differ, one may be
+  stale, and a transmission under a stale key fails invisibly (it is simply never
+  echoed back). Now logs an error when candidates disagree, so the failure is
+  visible instead of silent. Picking the key that verifies recent traffic needs a
+  decode pass at startup — deliberately not done yet.
+- **The rebuild check opened the database on every idle poll** (every 2s on a
+  quiet mesh). Now runs about once a minute.
+
 # 0.8.1 — second review pass
 
 A second reviewer (a different vendor's frontier general model, given the first

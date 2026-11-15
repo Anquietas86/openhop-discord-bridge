@@ -95,6 +95,18 @@ class Bridge:
             if not candidates:
                 missing.append(mapping.mesh_channel)
                 continue
+            # RX tries every candidate; TX can only use one. The same channel
+            # name often exists on several companions, and if they disagree the
+            # first row may be a stale key — the transmission would then go out
+            # under a key the rest of the mesh cannot verify, failing silently
+            # (nothing is ever echoed back).
+            distinct = {c[:16] for c in candidates}
+            if len(distinct) > 1:
+                logger.error(
+                    "channel %r has %d different secrets across companions; "
+                    "transmitting with the first — verify TX is heard on air",
+                    mapping.mesh_channel, len(distinct),
+                )
             keys[mapping.mesh_channel] = candidates[0][:16]
         if missing:
             raise ConfigError(

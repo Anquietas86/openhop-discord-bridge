@@ -149,6 +149,7 @@ class PacketTailer:
         self.secrets = secrets
         self.wanted = set(wanted_channels) if wanted_channels is not None else None
         self._cursor = 0
+        self._idle_polls = 0
         self._seen: "OrderedDict[tuple, None]" = OrderedDict()
         self._dedupe_size = dedupe_size
         self._start_from_latest = start_from_latest
@@ -244,7 +245,12 @@ class PacketTailer:
             try:
                 batch = await asyncio.to_thread(self.fetch_new)
                 if not batch:
-                    await asyncio.to_thread(self._recover_cursor_if_rebuilt)
+                    # The rebuild check opens the database, so run it every ~30
+                    # idle polls (about a minute) rather than every 2 seconds.
+                    self._idle_polls += 1
+                    if self._idle_polls >= 30:
+                        self._idle_polls = 0
+                        await asyncio.to_thread(self._recover_cursor_if_rebuilt)
                 for message in batch:
                     try:
                         on_message(message)
