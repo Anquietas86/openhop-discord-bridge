@@ -20,6 +20,7 @@ from .config import ChannelMapping, Config, ConfigError, load_config
 from .discord_side import BridgeDiscord, build_intents, flatten_for_mesh
 from .policy import (
     EchoGuard,
+    Outbound,
     OutboundQueue,
     TokenBucket,
     mesh_sender_label,
@@ -31,6 +32,16 @@ from .protocol import CompanionClient, CompanionError
 from .reader import MeshMessage, PacketTailer, load_channel_secrets
 
 logger = logging.getLogger("openhop_discord_bridge")
+
+# Reaction vocabulary. The message itself is the only progress UI a Discord user
+# gets, so each state is distinct: queued is not the same as transmitted, and
+# "heard back" is the only one that proves the mesh actually carried it.
+REACT_QUEUED = "\U0001f4e1"   # 📡 accepted into the queue
+REACT_SENT = "\u2705"         # ✅ node accepted it — on air
+REACT_HEARD = "\U0001f4fb"    # 📻 came back through the packet log
+REACT_FAILED = "\u274c"       # ❌ transmission failed
+REACT_REFUSED = "\u26d4"      # ⛔ not on the allowlist
+REACT_THROTTLED = "\u23f3"    # ⏳ rate limited
 
 
 class Bridge:
@@ -48,6 +59,7 @@ class Bridge:
         self.secrets: Dict[str, list] = {}
         self.discord: Optional[BridgeDiscord] = None
         self._ready_done = False
+        self._pending_echo: dict[str, Outbound] = {}
         self._sender_task: Optional[asyncio.Task] = None
 
     # ── mesh keys ──────────────────────────────────────────────────────
@@ -254,6 +266,12 @@ class Bridge:
             return
         if self.echo.is_echo(message.text):
             logger.debug("suppressed echo of our own transmission: %r", message.text[:40])
+            confirmed = self._pending_echo.pop(
+                message.text.split(": ", 1)[1] if ": " in message.text else message.text, None
+            )
+            if confirmed is not None:
+                logger.info("delivery confirmed on the mesh for %s", confirmed.mesh_channel)
+                asyncio.create_task(self._react(confirmed, REACT_HEARD), name="react-heard")
             return
         text = message.text.strip()
         if not text:
@@ -283,10 +301,7 @@ class Bridge:
                 message.author.id,
                 mapping.mesh_channel,
             )
-            try:
-                await message.add_reaction("\u26d4")
-            except discord.HTTPException:
-                pass
+            await self._react(message, REACT_REFUSED)
             return
 
         text = flatten_for_mesh(message.clean_content) or "[attachment]"
@@ -306,18 +321,38 @@ class Bridge:
         if not self.bucket.try_take(mapping.mesh_channel):
             wait = self.bucket.retry_after(mapping.mesh_channel)
             logger.warning("rate-limited TX to %s (%.1fs)", mapping.mesh_channel, wait)
-            try:
-                await message.add_reaction("\u23f3")
-            except discord.HTTPException:
-                pass
+            await self._react(message, REACT_THROTTLED)
             return
 
         self.echo.remember(payload)
-        self.queue.put(mapping.mesh_channel, message.author.display_name, payload)
+        item = Outbound(
+            mesh_channel=mapping.mesh_channel,
+            author=label,
+            text=payload,
+            discord_channel_id=message.channel.id,
+            message_id=message.id,
+        )
+        dropped = self.queue.put(item)
+        if dropped is not None:
+            logger.warning("outbound queue full; dropped a message for %s", dropped.mesh_channel)
+        self._pending_echo[payload] = item
+        await self._react(message, REACT_QUEUED)
+
+    async def _react(self, ref, emoji: str) -> None:
+        """React to the originating Discord message (best effort, never fatal)."""
+        if self.discord is None or ref is None:
+            return
         try:
-            await message.add_reaction("\U0001f4e1")
-        except discord.HTTPException:
-            pass
+            if isinstance(ref, discord.Message):
+                await ref.add_reaction(emoji)
+                return
+            channel = self.discord.get_channel(getattr(ref, "discord_channel_id", None))
+            message_id = getattr(ref, "message_id", None)
+            if channel is None or message_id is None:
+                return
+            await channel.get_partial_message(message_id).add_reaction(emoji)
+        except (discord.HTTPException, AttributeError):
+            logger.debug("could not react %s", emoji, exc_info=True)
 
     async def _link_supervisor(self) -> None:
         """Keep the companion socket alive across repeater restarts.
@@ -347,7 +382,7 @@ class Bridge:
             if item is None:
                 await asyncio.sleep(0.25)
                 continue
-            mesh_channel, _author, payload = item
+            mesh_channel, payload = item.mesh_channel, item.text
             idx = self.link.channels.get(mesh_channel)
             if idx is None:
                 logger.error("no companion channel index for %s; dropping", mesh_channel)
@@ -358,8 +393,10 @@ class Bridge:
                     await self.link.provision_channels(self._channel_keys())
                 await self.link.send_channel(idx, payload.encode("utf-8"), int(time.time()))
                 logger.info("TX %s (%dB): %s", mesh_channel, len(payload.encode()), payload)
+                await self._react(item, REACT_SENT)
             except (CompanionError, OSError):
                 logger.exception("TX to %s failed", mesh_channel)
+                await self._react(item, REACT_FAILED)
 
 
 async def _amain(config: Config) -> int:

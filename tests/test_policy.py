@@ -72,13 +72,26 @@ def test_token_bucket_is_per_key():
 
 
 def test_outbound_queue_drops_oldest():
+    """Overflow drops the oldest: the newest message is the one being waited on."""
+    from openhop_discord_bridge.policy import Outbound
+
     q = OutboundQueue(maxsize=2)
-    q.put("Public", "a", "one")
-    q.put("Public", "a", "two")
-    dropped = q.put("Public", "a", "three")
-    assert dropped == ("Public", "a", "one")
+    q.put(Outbound("Public", "a", "one"))
+    q.put(Outbound("Public", "a", "two"))
+    dropped = q.put(Outbound("Public", "a", "three"))
+    assert dropped == Outbound("Public", "a", "one")
     assert len(q) == 2
-    assert q.get() == ("Public", "a", "two")
+    assert q.get() == Outbound("Public", "a", "two")
+
+
+def test_outbound_carries_discord_message_reference():
+    """The reference is what lets the sender tick the original Discord message."""
+    from openhop_discord_bridge.policy import Outbound
+
+    item = Outbound("Public", "Josh", "hi", discord_channel_id=123, message_id=456)
+    assert item.discord_channel_id == 123
+    assert item.message_id == 456
+    assert Outbound("Public", "Josh", "hi").message_id is None
 
 
 def test_mapping_permits_requires_explicit_grant():

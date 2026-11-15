@@ -1,3 +1,24 @@
+# 0.4.0
+
+- **Reaction vocabulary** on the originating Discord message, so transmission
+  state is visible without reading logs:
+
+  | Reaction | Meaning |
+  | --- | --- |
+  | 📡 | queued for transmission |
+  | ✅ | transmitted — the node accepted it |
+  | 📻 | heard back on the mesh — the relay carried it |
+  | ❌ | transmission failed |
+  | ⛔ | refused (sender not on the channel's allowlist) |
+  | ⏳ | rate limited |
+
+  `✅` is applied by the sender loop *after* the node accepts the frame, not at
+  queue time, so it means "on air" rather than "accepted by the bridge". `📻`
+  comes from the echo the bridge already detects, reused as a delivery receipt.
+- The outbound queue now carries a reference to the Discord message
+  (`Outbound` dataclass), which is what makes late reactions possible.
+- 68 tests passing.
+
 # 0.3.2
 
 - **Channel and user ids are stored as strings** in `config.json`. Discord

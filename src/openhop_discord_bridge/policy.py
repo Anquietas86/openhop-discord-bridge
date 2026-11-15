@@ -187,6 +187,21 @@ class TokenBucket:
         return (1.0 - tokens) * self.refill_seconds
 
 
+@dataclass(frozen=True)
+class Outbound:
+    """One queued transmission, with the Discord message it came from.
+
+    The message reference is what lets the sender loop tick the original message
+    once the transmission actually succeeds, instead of guessing at queue time.
+    """
+
+    mesh_channel: str
+    author: str
+    text: str
+    discord_channel_id: int | None = None
+    message_id: int | None = None
+
+
 class OutboundQueue:
     """Bounded FIFO of transmissions, drained by the sender task.
 
@@ -195,16 +210,16 @@ class OutboundQueue:
     """
 
     def __init__(self, maxsize: int = 50) -> None:
-        self._q: Deque[Tuple[str, str, str]] = deque(maxlen=max(1, maxsize))
+        self._q: Deque[Outbound] = deque(maxlen=max(1, maxsize))
 
-    def put(self, mesh_channel: str, author: str, text: str) -> Optional[Tuple[str, str, str]]:
+    def put(self, item: Outbound) -> Optional[Outbound]:
         dropped = None
         if len(self._q) == self._q.maxlen:
             dropped = self._q.popleft()
-        self._q.append((mesh_channel, author, text))
+        self._q.append(item)
         return dropped
 
-    def get(self) -> Optional[Tuple[str, str, str]]:
+    def get(self) -> Optional[Outbound]:
         return self._q.popleft() if self._q else None
 
     def __len__(self) -> int:

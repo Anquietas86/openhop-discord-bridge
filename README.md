@@ -59,6 +59,24 @@ needed to add or re-index its channels.
 - `allowed_user_ids` / `allowed_role_ids` gate transmission. **Empty means
   nobody** — bridging a Discord channel onto RF is never an implicit grant.
 
+## Reaction vocabulary
+
+The bridge reacts to the Discord message it came from, so transmission state is
+visible without reading logs:
+
+| Reaction | Meaning |
+| --- | --- |
+| 📡 | queued for transmission |
+| ✅ | transmitted — the node accepted it, it is on air |
+| 📻 | heard back on the mesh — the relay carried it (delivery receipt) |
+| ❌ | transmission failed |
+| ⛔ | refused — sender is not on that channel's allowlist |
+| ⏳ | rate limited (token bucket empty) |
+
+`✅` is applied after the companion accepts the frame, not when the message is
+queued, so it means on-air rather than accepted-by-the-bridge. `📻` is derived
+from the bridge hearing its own transmission return through the packet log.
+
 ## Install
 
 ```bash
