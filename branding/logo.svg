@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="MeshCore and Discord bridge">
+  <title>openHop Discord Bridge</title>
+  <desc>A chat bubble carrying a mesh constellation. Solid silhouette so it holds on light and dark backgrounds.</desc>
+  <!-- translate compensates for the tail's curve overshooting the body's left
+       edge: measured ink bbox was 10px left / 5.5px high before this. -->
+  <g transform="translate(10 6)">
+  <path d="M160 80h192a64 64 0 0 1 64 64v128a64 64 0 0 1-64 64h-88l-92 80q-10 8-16 2-5-5-5-13v-69h-11a64 64 0 0 1-64-64V144a64 64 0 0 1 64-64z"
+        fill="#5865F2"/>
+  <!-- constellation: raised so the body's padding reads even above and below -->
+  <g stroke="#FFFFFF" stroke-width="11" stroke-linecap="round">
+    <line x1="166" y1="158" x2="346" y2="158"/>
+    <line x1="346" y1="158" x2="256" y2="272"/>
+    <line x1="256" y1="272" x2="166" y2="158"/>
+  </g>
+  <g fill="#FFFFFF">
+    <circle cx="166" cy="158" r="19"/>
+    <circle cx="346" cy="158" r="19"/>
+    <circle cx="256" cy="272" r="19"/>
+  </g>
+  </g>
+</svg>

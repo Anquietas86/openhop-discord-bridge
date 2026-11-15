@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="branding/lockup-dark.svg">
+  <img src="branding/lockup-light.svg" alt="openHop Discord Bridge — two-way MeshCore ↔ Discord bridge" width="620">
+</picture>
+
 # openHop Discord Bridge
 
 Two-way bridge between **MeshCore channels** and **Discord channels**, packaged as
@@ -123,6 +128,20 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev]"
 - Mesh has no attachments, edits or reactions — Discord-only concepts are dropped
   (an attachment-only message becomes `[attachment]`).
 - A message longer than the byte budget is truncated on a word boundary with `…`.
+
+## Branding
+
+| File | Use |
+| --- | --- |
+| `branding/logo.svg` | primary mark — vector, works on light and dark |
+| `branding/logo-512.png` / `-128.png` / `-64.png` | Discord avatar, plugin icon, favicon |
+| `branding/lockup-light.svg` / `lockup-dark.svg` | README header, light and dark themes |
+
+The mark is a chat bubble carrying a mesh constellation: the silhouette reads
+as Discord at any size, the nodes read as a mesh. Ink bounding box is centred to
+within a pixel of the canvas, and nothing in the mark depends on the background
+colour, so it survives both themes.
+
 
 ## Licence
 
