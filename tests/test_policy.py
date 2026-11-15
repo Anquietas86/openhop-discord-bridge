@@ -92,10 +92,17 @@ def test_mapping_permits_requires_explicit_grant():
 
 
 def test_mapping_from_dict_validation():
+    # An id is optional now (auto-provisioning can create the channel), but the
+    # mesh channel is mandatory and a supplied id must be numeric and positive.
     with pytest_raises(ConfigError):
         ChannelMapping.from_dict({"discord_channel_id": 1})
     with pytest_raises(ConfigError):
-        ChannelMapping.from_dict({"mesh_channel": "Public"})
+        ChannelMapping.from_dict({"mesh_channel": "Public", "discord_channel_id": "not-a-number"})
+    with pytest_raises(ConfigError):
+        ChannelMapping.from_dict({"mesh_channel": "Public", "discord_channel_id": -5})
+    mapping = ChannelMapping.from_dict({"mesh_channel": "Public"})
+    assert mapping.discord_channel_id is None
+    assert mapping.resolved_channel_name() == "public"
 
 
 class pytest_raises:

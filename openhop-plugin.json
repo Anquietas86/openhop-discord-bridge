@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "discord.bridge",
   "name": "Discord Bridge",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "Two-way bridge between MeshCore channels and Discord channels, using a dedicated companion identity on its own TCP port.",
   "runtime": {
     "type": "python",
@@ -25,7 +25,11 @@
       "echo_ttl_seconds": 120,
       "start_from_latest": true,
       "log_level": "INFO",
-      "companion_node_name": "Discord Bridge"
+      "companion_node_name": "Discord Bridge",
+      "discord_autoprovision": false,
+      "discord_category_name": "\ud83d\udcac | Meshcore",
+      "discord_channel_prefix": "",
+      "discord_guild_id": null
     }
   }
 }

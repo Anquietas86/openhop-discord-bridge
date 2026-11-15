@@ -1,3 +1,19 @@
+# 0.2.0
+
+- **Auto-provisioning** (`discord_autoprovision`): on first ready the bot ensures
+  `discord_category_name` (default `💬 | Meshcore`) exists, creates one
+  text channel per mapping under it, grants itself View Channel / Read History /
+  Manage Webhooks / Send Messages on the category, and writes the resolved ids
+  back into `config.json` so later starts reuse them.
+- Mappings may omit `discord_channel_id` when auto-provisioning is on; the name
+  is derived from the mesh channel (`#hamradio` -> `hamradio`,
+  `Adelaide Chat` -> `adelaide-chat`) with an optional `discord_channel_prefix`.
+- Requires **Manage Channels** on the bot's role. Without it provisioning logs a
+  clear failure and the bridge keeps running with the ids it already has.
+- The packet tailer now starts only after Discord is ready, so mappings exist
+  before any message is routed.
+- Tests: 55 passing.
+
 # 0.1.3
 
 - Fix: the repeater prepends `<node_name>: ` to every channel message it

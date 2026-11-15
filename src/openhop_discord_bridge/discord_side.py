@@ -46,6 +46,7 @@ class BridgeDiscord(discord.Client):
 
     async def on_ready(self) -> None:
         logger.info("Discord connected as %s (id=%s)", self.user, getattr(self.user, "id", "?"))
+        await self.bridge.on_discord_ready()
 
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot or message.webhook_id is not None:

@@ -33,6 +33,21 @@ MANIFEST_DEFAULTS: Dict[str, Any] = {
 }
 
 
+def normalise_channel_name(name: str) -> str:
+    """Discord channel names: lowercase, no '#', spaces to dashes, <=100 chars."""
+    cleaned = name.strip().lstrip("#").strip().lower()
+    out = []
+    for ch in cleaned:
+        if ch.isalnum() or ch in "-_":
+            out.append(ch)
+        elif ch in " .\t/":
+            out.append("-")
+    slug = "".join(out).strip("-")
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug[:100] or "mesh"
+
+
 class ConfigError(Exception):
     """Raised when the bridge is misconfigured in a way that cannot be papered over."""
 
@@ -42,12 +57,13 @@ class ChannelMapping:
     """One mesh channel paired with one Discord channel."""
 
     mesh_channel: str
-    discord_channel_id: int
+    discord_channel_id: Optional[int] = None
     mesh_to_discord: bool = True
     discord_to_mesh: bool = True
     allowed_role_ids: List[int] = field(default_factory=list)
     allowed_user_ids: List[int] = field(default_factory=list)
     prefix_template: Optional[str] = None
+    discord_channel_name: Optional[str] = None
 
     @classmethod
     def from_dict(cls, raw: Dict[str, Any]) -> "ChannelMapping":
@@ -57,14 +73,17 @@ class ChannelMapping:
         if not mesh:
             raise ConfigError("channel mapping is missing 'mesh_channel'")
         cid = raw.get("discord_channel_id")
-        try:
-            cid = int(cid)
-        except (TypeError, ValueError):
-            raise ConfigError(
-                f"channel mapping for {mesh!r} needs a numeric 'discord_channel_id'"
-            ) from None
-        if cid <= 0:
-            raise ConfigError(f"channel mapping for {mesh!r} has an invalid discord_channel_id")
+        if cid is None:
+            cid = None  # resolved later by autoprovisioning, by name
+        else:
+            try:
+                cid = int(cid)
+            except (TypeError, ValueError):
+                raise ConfigError(
+                    f"channel mapping for {mesh!r} has a non-numeric 'discord_channel_id'"
+                ) from None
+            if cid <= 0:
+                raise ConfigError(f"channel mapping for {mesh!r} has an invalid discord_channel_id")
         return cls(
             mesh_channel=mesh,
             discord_channel_id=cid,
@@ -73,7 +92,14 @@ class ChannelMapping:
             allowed_role_ids=[int(x) for x in raw.get("allowed_role_ids") or []],
             allowed_user_ids=[int(x) for x in raw.get("allowed_user_ids") or []],
             prefix_template=raw.get("prefix_template"),
+            discord_channel_name=raw.get("discord_channel_name"),
         )
+
+    def resolved_channel_name(self, prefix: str = "") -> str:
+        """Discord channel name for this mapping, if one has to be created."""
+        if self.discord_channel_name:
+            return normalise_channel_name(prefix + self.discord_channel_name)
+        return normalise_channel_name(prefix + self.mesh_channel)
 
     def permits(self, author_id: int, role_ids: List[int]) -> bool:
         """Whether a Discord author may transmit on this mapping.
@@ -104,6 +130,10 @@ class Config:
     echo_ttl_seconds: float
     start_from_latest: bool
     log_level: str
+    discord_autoprovision: bool = False
+    discord_category_name: str = "\U0001f4ac | Meshcore"
+    discord_channel_prefix: str = ""
+    discord_guild_id: Optional[int] = None
 
     def mapping_for_mesh(self, name: str) -> Optional[ChannelMapping]:
         for m in self.channels:
@@ -173,14 +203,23 @@ def load_config(path: Optional[Path] = None) -> Config:
     if not mappings:
         raise ConfigError("no channel mappings: 'channels' is empty, so there is nothing to bridge")
 
+    autoprovision = bool(raw.get("discord_autoprovision", False))
+    for m in mappings:
+        if m.discord_channel_id is None and not autoprovision:
+            raise ConfigError(
+                f"channel mapping for {m.mesh_channel!r} has no discord_channel_id "
+                "and discord_autoprovision is off"
+            )
+
     seen_discord = set()
     seen_mesh = set()
     for m in mappings:
-        if m.discord_channel_id in seen_discord:
+        if m.discord_channel_id is not None and m.discord_channel_id in seen_discord:
             raise ConfigError(f"Discord channel {m.discord_channel_id} is mapped twice")
         if m.mesh_channel in seen_mesh:
             raise ConfigError(f"mesh channel {m.mesh_channel!r} is mapped twice")
-        seen_discord.add(m.discord_channel_id)
+        if m.discord_channel_id is not None:
+            seen_discord.add(m.discord_channel_id)
         seen_mesh.add(m.mesh_channel)
 
     max_bytes = int(raw.get("max_mesh_bytes") or 128)
@@ -206,4 +245,8 @@ def load_config(path: Optional[Path] = None) -> Config:
         echo_ttl_seconds=max(0.0, float(raw.get("echo_ttl_seconds") or 120)),
         start_from_latest=bool(raw.get("start_from_latest", True)),
         log_level=str(raw.get("log_level") or "INFO").upper(),
+        discord_autoprovision=bool(raw.get("discord_autoprovision", False)),
+        discord_category_name=str(raw.get("discord_category_name") or "\U0001f4ac | Meshcore"),
+        discord_channel_prefix=str(raw.get("discord_channel_prefix") or ""),
+        discord_guild_id=(int(raw["discord_guild_id"]) if raw.get("discord_guild_id") else None),
     )
