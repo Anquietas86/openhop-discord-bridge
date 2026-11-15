@@ -122,13 +122,16 @@ class Bridge:
             )
 
     async def provision_discord(self) -> None:
-        """Ensure the category and one channel per mapping exist, then pin the ids.
+        """Reconcile every mapping against Discord, creating channels if allowed.
 
-        Needs Manage Channels. Ids resolved here are written back to config.json so
-        later starts reuse the same channels instead of re-deriving them.
+        Runs on every start, not just when autoprovisioning, because a stored id
+        can be *wrong* rather than absent: Discord snowflakes exceed float64
+        precision, so any editor that parses JSON numbers as floats rewrites
+        ...749224 as ...749200. A mapping is therefore verified against the live
+        guild and re-resolved by name when the id does not exist.
         """
         cfg = self.config
-        if not cfg.discord_autoprovision or self.discord is None:
+        if self.discord is None:
             return
         guild = (
             self.discord.get_guild(cfg.discord_guild_id)
@@ -136,54 +139,66 @@ class Bridge:
             else (self.discord.guilds[0] if self.discord.guilds else None)
         )
         if guild is None:
-            logger.error("autoprovision: the bot is not in any guild")
+            logger.error("provisioning: the bot is not in any guild")
             return
 
         category = discord.utils.get(guild.categories, name=cfg.discord_category_name)
-        if category is None:
+        if category is None and cfg.discord_autoprovision:
             category = await guild.create_category(
                 cfg.discord_category_name, reason="MeshCore bridge setup"
             )
             logger.info("created category %r", cfg.discord_category_name)
 
-        # Deliberately NO per-channel overwrites. A member overwrite on the child
-        # channel SHADOWS the category's member overwrite instead of adding to it,
-        # so granting the bot Manage Channels on the category (the tidy, scoped
-        # grant) stopped applying the moment we stamped our own overwrite on the
-        # channel — leaving channels the bot could create but never delete. The
-        # bot role already carries View Channel, Read Message History, Manage
-        # Webhooks and Send Messages, so inheriting the category is correct.
-        overwrites = None
-
         resolved = {}
         for mapping in cfg.channels:
-            if mapping.discord_channel_id is not None:
-                resolved[mapping.mesh_channel] = mapping.discord_channel_id
+            live = (
+                self.discord.get_channel(mapping.discord_channel_id)
+                if mapping.discord_channel_id
+                else None
+            )
+            if live is not None:
+                resolved[mapping.mesh_channel] = live.id
                 continue
+
             name = mapping.resolved_channel_name(cfg.discord_channel_prefix)
-            existing = discord.utils.get(category.text_channels, name=name)
-            if existing is None:
+            target = discord.utils.get(category.text_channels, name=name) if category else None
+            if target is None:
+                target = discord.utils.get(guild.text_channels, name=name)
+
+            if target is None and cfg.discord_autoprovision and category is not None:
                 try:
-                    existing = await guild.create_text_channel(
-                        name, category=category, overwrites=overwrites,
-                        reason="MeshCore bridge setup",
+                    target = await guild.create_text_channel(
+                        name, category=category, reason="MeshCore bridge setup"
                     )
                     logger.info("created #%s under %r", name, cfg.discord_category_name)
                 except discord.Forbidden:
-                    # One channel refused must not cost the rest: keep going and
-                    # report exactly which mapping is unprovisioned.
                     logger.error(
-                        "cannot create #%s: the bot needs Manage Channels on the "
-                        "%r category. Mesh channel %r stays unmapped.",
+                        "cannot create #%s: the bot needs Manage Channels on the %r "
+                        "category. Mesh channel %r stays unmapped.",
                         name, cfg.discord_category_name, mapping.mesh_channel,
                     )
                     continue
                 except discord.HTTPException:
                     logger.exception("Discord refused to create #%s", name)
                     continue
-            mapping.discord_channel_id = existing.id
-            resolved[mapping.mesh_channel] = existing.id
-            logger.info("mapped mesh %r -> #%s (%s)", mapping.mesh_channel, existing.name, existing.id)
+
+            if target is None:
+                logger.error(
+                    "mesh channel %r maps to stored id %s, which does not exist, and "
+                    "no live #%s was found. Leaving it unmapped.",
+                    mapping.mesh_channel, mapping.discord_channel_id, name,
+                )
+                continue
+
+            if mapping.discord_channel_id is not None:
+                logger.warning(
+                    "mesh channel %r had a stale id %s (float-rounded?); "
+                    "re-resolved to #%s (%s)",
+                    mapping.mesh_channel, mapping.discord_channel_id, target.name, target.id,
+                )
+            mapping.discord_channel_id = target.id
+            resolved[mapping.mesh_channel] = target.id
+            logger.info("mapped mesh %r -> #%s (%s)", mapping.mesh_channel, target.name, target.id)
 
         self._persist_channel_ids(resolved)
 

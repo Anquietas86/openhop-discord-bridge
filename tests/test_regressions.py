@@ -77,3 +77,29 @@ def test_env_token_overrides_file(tmp_path, monkeypatch):
     monkeypatch.setenv("DISCORD_BOT_TOKEN", GOOD_TOKEN + "X")
     cfg = load_config(write_cfg(tmp_path, discord_token="placeholder"))
     assert cfg.discord_token.endswith("X")
+
+
+def test_string_channel_ids_are_accepted(tmp_path):
+    """Ids may arrive as strings; a JSON editor that quotes them must still work."""
+    from openhop_discord_bridge.config import ChannelMapping
+
+    m = ChannelMapping.from_dict(
+        {"mesh_channel": "Public", "discord_channel_id": "1571423335894749224"}
+    )
+    assert m.discord_channel_id == 1571423335894749224
+
+
+def test_snowflake_survives_json_roundtrip_without_float(tmp_path):
+    """A float-parsed id is knowingly lossy; the loader must at least not invent one."""
+    import json
+
+    from openhop_discord_bridge.config import ChannelMapping
+
+    true_id = 1571423335894749224
+    assert json.loads(json.dumps({"id": true_id}))["id"] == true_id
+    # What a lossy editor produces, and why re-resolution by name is needed:
+    lossy = int(float(true_id))
+    assert lossy != true_id
+    assert ChannelMapping.from_dict(
+        {"mesh_channel": "Public", "discord_channel_id": lossy}
+    ).discord_channel_id == lossy

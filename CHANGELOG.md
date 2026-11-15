@@ -1,3 +1,16 @@
+# 0.3.1
+
+- **Mappings are reconciled against Discord on every start**, not only when
+  auto-provisioning. A stored id can be *wrong* rather than missing: Discord
+  snowflakes exceed float64 precision, so any editor that parses JSON numbers as
+  floats rewrites `...749224` as `...749200`. Such a mapping now logs a warning,
+  re-resolves the channel by name, and persists the corrected id.
+- A mapping whose stored id does not exist and whose name cannot be found is
+  logged and left unmapped instead of silently posting to a void.
+- `discord_channel_id` accepts a string as well as a number, so a JSON editor
+  that quotes ids is harmless.
+- 66 tests passing.
+
 # 0.3.0
 
 - **`discord_sender_name`**: label Discord speakers on the mesh by `display_name`
