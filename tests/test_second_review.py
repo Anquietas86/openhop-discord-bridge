@@ -7,6 +7,7 @@ fixes missed in these two places. That is why a foreign model reviews this repo.
 
 import asyncio
 import json
+import pathlib
 
 import pytest
 
@@ -114,3 +115,36 @@ async def test_missing_channel_index_marks_the_message_failed():
         await task
 
     assert REACT_FAILED in reactions, "user must see a failure tick, not a permanent queued tick"
+
+
+# ── found while writing the public example config ──────────────────────
+@pytest.mark.parametrize("blank", [None, "", "   "])
+def test_blank_channel_id_means_unresolved_not_invalid(blank):
+    """A form that renders an empty string must not be rejected as non-numeric."""
+    from openhop_discord_bridge.config import ChannelMapping
+
+    mapping = ChannelMapping.from_dict(
+        {"mesh_channel": "Public", "discord_channel_id": blank}
+    )
+    assert mapping.discord_channel_id is None
+
+
+def test_junk_channel_id_is_still_rejected():
+    from openhop_discord_bridge.config import ChannelMapping
+
+    with pytest.raises(ConfigError, match="non-numeric"):
+        ChannelMapping.from_dict(
+            {"mesh_channel": "Public", "discord_channel_id": "not-an-id"}
+        )
+
+
+def test_example_config_validates_against_the_loader(tmp_path):
+    """examples/config.example.json must be copy-paste usable."""
+    data = json.loads((pathlib.Path(__file__).resolve().parents[1]
+                       / "examples" / "config.example.json").read_text())
+    data["discord_token"] = TOKEN
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(data))
+    loaded = load_config(cfg_path)
+    assert len(loaded.channels) == 2
+    assert loaded.discord_autoprovision is True

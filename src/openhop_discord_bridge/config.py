@@ -165,8 +165,11 @@ class ChannelMapping:
         if not mesh:
             raise ConfigError("channel mapping is missing 'mesh_channel'")
         cid = raw.get("discord_channel_id")
-        if cid is None:
-            cid = None  # resolved later by autoprovisioning, by name
+        if cid is None or (isinstance(cid, str) and not cid.strip()):
+            # Absent, null, or blank all mean "not resolved yet": autoprovisioning
+            # fills it in by name. A settings form that renders an empty string
+            # would otherwise be rejected as non-numeric.
+            cid = None
         else:
             try:
                 cid = int(cid)

@@ -15,8 +15,11 @@ much as the code from here.
   belongs, 403 on autoprovision, edits that need a disable/enable, transmit gated
   three ways, stale role ids, companion reconnects, WAL needing directory write
   access, snowflake precision, and webhook name rejections.
-- **Adds `examples/config.example.json`**, which validates against the loader
-  as-is once the token and channel ids are filled in.
+- **Adds `examples/config.example.json`.** Writing it exposed a real bug: a
+  blank `discord_channel_id` (`""`, as a settings form renders it) was rejected as
+  non-numeric instead of meaning "not resolved yet, autoprovision will fill it in".
+  Absent, null and blank are now equivalent, and genuine junk is still rejected.
+  The example is asserted against the loader in the test suite.
 
 # 0.8.2 — close the last two review items
 
