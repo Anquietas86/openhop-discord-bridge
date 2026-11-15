@@ -33,6 +33,10 @@ MANIFEST_DEFAULTS: Dict[str, Any] = {
     "echo_ttl_seconds": 120,
     "start_from_latest": True,
     "log_level": "INFO",
+    "discord_autoprovision": False,
+    "discord_category_name": "\U0001f4ac | Meshcore",
+    "discord_channel_prefix": "",
+    "discord_guild_id": None,
 }
 
 

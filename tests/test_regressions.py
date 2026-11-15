@@ -124,3 +124,39 @@ def test_ids_are_persisted_as_strings(tmp_path, monkeypatch):
     data = json.loads(path.read_text())
     assert data["channels"][0]["discord_channel_id"] == "1571423335894749224"
     assert data["channels"][0]["allowed_user_ids"] == ["365689347485204482"]
+
+
+def test_manifest_defaults_match_loader_defaults():
+    """The manifest is the contract a settings UI reads; the loader must agree.
+
+    These drifted once (four auto-provisioning keys were added to the manifest and
+    not to MANIFEST_DEFAULTS), which is invisible until someone reads one and not
+    the other.
+    """
+    import json
+    import pathlib
+
+    from openhop_discord_bridge.config import MANIFEST_DEFAULTS
+
+    manifest = json.loads(
+        (pathlib.Path(__file__).parent.parent / "openhop-plugin.json").read_text()
+    )["config"]["defaults"]
+
+    assert set(manifest) == set(MANIFEST_DEFAULTS), (
+        f"only in manifest: {sorted(set(manifest) - set(MANIFEST_DEFAULTS))}; "
+        f"only in loader: {sorted(set(MANIFEST_DEFAULTS) - set(manifest))}"
+    )
+    for key in manifest:
+        assert manifest[key] == MANIFEST_DEFAULTS[key], f"{key} default differs"
+
+
+def test_readme_documents_every_config_key():
+    """A config table that silently omits a key is worse than no table."""
+    import json
+    import pathlib
+
+    root = pathlib.Path(__file__).parent.parent
+    manifest = json.loads((root / "openhop-plugin.json").read_text())["config"]["defaults"]
+    readme = (root / "README.md").read_text()
+    missing = [key for key in manifest if f"`{key}`" not in readme]
+    assert not missing, f"README does not document: {sorted(missing)}"

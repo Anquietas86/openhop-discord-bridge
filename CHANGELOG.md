@@ -1,3 +1,16 @@
+# 0.4.1
+
+- **README: full configuration reference.** Two generated tables (top-level fields
+  and `channels[]` entries) covering every key, its type, default and behaviour,
+  produced from `openhop-plugin.json` by `scripts/gen_config_table.py`.
+- **Fix: `MANIFEST_DEFAULTS` had drifted from the manifest.** Four
+  auto-provisioning keys (`discord_autoprovision`, `discord_category_name`,
+  `discord_channel_prefix`, `discord_guild_id`) were in the manifest but absent
+  from the loader's defaults dict — behaviour was correct via fallbacks, but
+  anything reading one and not the other saw different contracts.
+- **Tests:** manifest/loader parity, and that every config key appears in the
+  README. 70 passing.
+
 # 0.4.0
 
 - **Reaction vocabulary** on the originating Discord message, so transmission

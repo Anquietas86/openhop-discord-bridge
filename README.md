@@ -96,38 +96,72 @@ repeater database at startup, so only the identity needs creating by hand.
 
 ## Configuration
 
-`$OPENHOP_PLUGIN_DATA/config.json` (the bot token may instead come from
-`DISCORD_BOT_TOKEN`, which keeps it out of files that get shared):
+`$OPENHOP_PLUGIN_DATA/config.json`, mode `0600`. The bot token may instead come
+from `DISCORD_BOT_TOKEN`, which keeps it out of any file you might share.
+
+### Top-level fields
+
+| Key | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `discord_token` | string | (empty) | Bot token from Developer Portal > Bot > Reset Token. **Two dots, ~70+ chars.** `DISCORD_BOT_TOKEN` overrides it; keep the file `0600`. |
+| `companion_host` | string | `"127.0.0.1"` | Host of the companion frame server. Loopback by default because the bridge runs on the repeater host. |
+| `companion_port` | int | `5003` | Port of the bridge's **own** companion. Never point this at a shared companion (Hermes, Home Assistant, a base station). |
+| `companion_app_name` | string | `"discord-bridge"` | Name sent in the `APP_START` handshake; shows up in the repeater log. |
+| `repeater_db_path` | string | `"/var/lib/openhop_repeater/repeater.db"` | Repeater SQLite database, opened `mode=ro`. Group text is read from the `packets` table; there is no chat API. |
+| `channels` | list | (empty) | Channel mappings, one object per mesh channel — see the mapping table below. |
+| `poll_interval_seconds` | float | `2.0` | How often the packet table is polled. |
+| `max_mesh_bytes` | int | `128` | Channel payload budget (128 for MeshCore group text). `companion_node_name` length + 2 is subtracted automatically, because the node prefixes its own name to every message. |
+| `mesh_prefix_template` | string | `"{author}: "` | Template for the speaker label, `{author}` is substituted. Costs payload bytes on every transmission. |
+| `webhook_name` | string | `"Mesh Bridge"` | Webhook created per Discord channel. Mesh senders appear as themselves via this webhook's `username`, not as the bot. |
+| `rate_capacity` | int | `3` | Token-bucket burst per channel: how many Discord messages can go out back-to-back. |
+| `rate_refill_seconds` | float | `12.0` | Seconds per token refill, per channel. |
+| `echo_ttl_seconds` | float | `120` | How long a transmitted payload is remembered, so the bridge's own message coming back through the packet log is suppressed rather than reposted. |
+| `start_from_latest` | bool | `true` | `true` ignores history on first start (no backfill into Discord); `false` replays the existing packet table. |
+| `log_level` | string | `"INFO"` | `DEBUG`, `INFO`, `WARNING` or `ERROR`. |
+| `companion_node_name` | string | `"Discord Bridge"` | Must match the companion's `node_name` in the repeater config. Used for the byte-budget overhead and as the prefix stripped when detecting echoes. |
+| `discord_autoprovision` | bool | `false` | Create the category and a channel per mapping on start. Needs **Manage Channels**. |
+| `discord_category_name` | string | `"\ud83d\udcac | Meshcore"` | Category to create or reuse for the bridge's channels. |
+| `discord_channel_prefix` | string | (empty) | Prefix for channel names derived from mesh channel names (`mesh-` gives `mesh-public`). |
+| `discord_guild_id` | string | (empty) | Guild id. Null means "the only guild the bot is in". Quote it — see the snowflake note below. |
+| `link_check_seconds` | float | `15.0` | Companion health check. After a repeater restart the link is half-closed while inbound keeps working, so this reconnects and re-provisions. |
+| `discord_sender_name` | string | `"display_name"` | `display_name` (what people see — "Josh Hagger") or `username` (the handle — "anquietas86"). |
+| `discord_sender_name_max_chars` | int | `24` | Cap on that label, since it spends the byte budget. |
+
+### Channel mapping (`channels[]` entries)
+
+| Key | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `mesh_channel` | string | yes | MeshCore channel name, e.g. `Public` or `#hamradio`. |
+| `discord_channel_id` | string | unless autoprovision | Discord channel id. **Quote it as a string** — see below. |
+| `discord_channel_name` | string | no | Explicit Discord name when auto-provisioning; defaults to the mesh name. |
+| `mesh_to_discord` | bool | no (`true`) | Mirror mesh traffic into Discord. |
+| `discord_to_mesh` | bool | no (`false`) | Transmit Discord messages onto the mesh. |
+| `allowed_user_ids` | list[string] | no | Who may transmit. **Empty means nobody** — enabling `discord_to_mesh` alone transmits nothing. |
+| `allowed_role_ids` | list[string] | no | Role-based alternative to naming users. |
+| `prefix_template` | string | no | Per-channel label template overriding `mesh_prefix_template`. |
+
+> **Quote every id.** Discord snowflakes are ~1.57e18 and exceed float64
+> precision. An openHop settings save round-trips this JSON through JavaScript,
+> which rewrites `1571423335894749224` as `1571423335894749200` — silently
+> breaking every mapping. Stored as strings they cannot be damaged. Existing
+> integer ids are converted on the next start.
+
+Minimal example:
 
 ```json
 {
   "discord_token": "",
-  "companion_host": "127.0.0.1",
   "companion_port": 5003,
-  "repeater_db_path": "/var/lib/openhop_repeater/repeater.db",
-  "max_mesh_bytes": 128,
-  "mesh_prefix_template": "{author}: ",
-  "discord_sender_name": "display_name",
-  "discord_sender_name_max_chars": 24,
-  "rate_capacity": 3,
-  "rate_refill_seconds": 12.0,
-  "echo_ttl_seconds": 120,
   "channels": [
     {
       "mesh_channel": "Public",
-      "discord_channel_id": 1489064468154417172,
+      "discord_channel_id": "1571423335894749224",
       "mesh_to_discord": true,
-      "discord_to_mesh": true,
-      "allowed_role_ids": [783623771440676905]
+      "discord_to_mesh": false
     }
   ]
 }
 ```
-
-`discord_sender_name` chooses how a Discord speaker is labelled on the mesh:
-`display_name` (the nickname / global display name people see, e.g. "Josh
-Hagger") or `username` (the account handle, e.g. "anquietas86"). The label spends
-the mesh byte budget, so it is capped by `discord_sender_name_max_chars`.
 
 Unmapped channels are ignored in both directions. `mesh_to_discord` and
 `discord_to_mesh` are independent, so a channel can be mirrored read-only.
