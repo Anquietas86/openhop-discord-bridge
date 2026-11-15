@@ -41,14 +41,29 @@ MANIFEST_DEFAULTS: Dict[str, Any] = {
 
 
 def normalise_channel_name(name: str) -> str:
-    """Discord channel names: lowercase, no '#', spaces to dashes, <=100 chars."""
-    cleaned = name.strip().lstrip("#").strip().lower()
+    """Discord channel name for a mesh channel: lowercase, spaces to dashes.
+
+    Emoji and other symbols are PRESERVED. Discord accepts them in channel names
+    (``#🛰-sarg`` is valid), and stripping them silently geed the mapping of a
+    channel someone had deliberately named with an emoji. Only characters Discord
+    rejects are dropped: punctuation, and anything that is not a letter, digit,
+    dash, underscore, symbol or combining mark.
+    """
+    import unicodedata
+
+    cleaned = name.strip().lstrip("#").strip().casefold()
     out = []
     for ch in cleaned:
         if ch.isalnum() or ch in "-_":
             out.append(ch)
-        elif ch in " .\t/":
+        elif ch.isspace() or ch in "./\\":
             out.append("-")
+        else:
+            # Emoji live in the Symbol categories; variation selectors and
+            # combining marks are Marks. Keep both so sequences stay intact.
+            category = unicodedata.category(ch)
+            if category.startswith(("S", "M")):
+                out.append(ch)
     slug = "".join(out).strip("-")
     while "--" in slug:
         slug = slug.replace("--", "-")

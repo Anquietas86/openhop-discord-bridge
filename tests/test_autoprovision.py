@@ -116,3 +116,22 @@ def test_sender_name_mode_default_and_override(tmp_path):
     path2 = cfg_file(tmp_path, discord_autoprovision=True,
                      channels=[{"mesh_channel": "Public"}], discord_sender_name="username")
     assert load_config(path2).discord_sender_name == "username"
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("🛰 SARG", "🛰-sarg"),
+        ("WarMobile🏎️", "warmobile🏎️"),   # emoji + variation selector
+        ("☕", "☕"),
+        (".😊.", "😊"),
+        ("Adelaide Chat", "adelaide-chat"),
+    ],
+)
+def test_discord_channel_names_keep_emoji(raw, expected):
+    """Discord accepts emoji in channel names; dropping them lost intent.
+
+    Verified against the live API: creating "🛰-emoji-probe" returns 201 with the
+    name intact, so a mesh channel named with an emoji can keep it.
+    """
+    assert normalise_channel_name(raw) == expected

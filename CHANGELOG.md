@@ -1,3 +1,15 @@
+# 0.4.2
+
+- **Derived Discord channel names keep emoji.** `normalise_channel_name` stripped
+  every non-alphanumeric character, so a mesh channel named `🛰 SARG` became
+  `#sarg` — silently losing what the operator had put there. Discord accepts
+  emoji in channel names (verified: creating `🛰-emoji-probe` returns 201 with the
+  name intact), so symbols and combining marks are now preserved:
+  `🛰 SARG` -> `#🛰-sarg`, `WarMobile🏎️` -> `#warmobile🏎️`.
+- Only characters Discord rejects are still dropped (punctuation, and anything
+  that is not a letter, digit, dash, underscore, symbol or combining mark).
+- 75 tests passing.
+
 # 0.4.1
 
 - **README: full configuration reference.** Two generated tables (top-level fields
