@@ -1,3 +1,13 @@
+# 0.3.2
+
+- **Channel and user ids are stored as strings** in `config.json`. Discord
+  snowflakes are ~1.57e18 and exceed float64 precision, so an openHop settings
+  save (which round-trips the JSON through JavaScript) silently rewrites
+  `...749224` as `...749200` — corrupting every mapping while the operator only
+  changed an unrelated field. Quoted ids cannot lose precision in that path.
+  Existing integer ids are converted on the next start and accepted on load.
+- 67 tests passing.
+
 # 0.3.1
 
 - **Mappings are reconciled against Discord on every start**, not only when

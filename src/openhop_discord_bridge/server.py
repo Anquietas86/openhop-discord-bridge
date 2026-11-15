@@ -214,7 +214,16 @@ class Bridge:
             for entry in data.get("channels") or []:
                 new_id = resolved.get(entry.get("mesh_channel"))
                 if new_id:
-                    entry["discord_channel_id"] = new_id
+                    # Store as a STRING: Discord snowflakes exceed float64
+                    # precision, and any settings UI that round-trips this JSON
+                    # through JavaScript silently rewrites an integer id's low
+                    # digits (...749224 -> ...749200). A quoted id cannot lose
+                    # precision in that path.
+                    entry["discord_channel_id"] = str(new_id)
+                if isinstance(entry.get("allowed_user_ids"), list):
+                    entry["allowed_user_ids"] = [str(x) for x in entry["allowed_user_ids"]]
+                if isinstance(entry.get("allowed_role_ids"), list):
+                    entry["allowed_role_ids"] = [str(x) for x in entry["allowed_role_ids"]]
             path.write_text(json.dumps(data, indent=2) + "\n")
             path.chmod(0o600)
             logger.info("persisted %d resolved channel id(s) to %s", len(resolved), path)

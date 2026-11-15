@@ -103,3 +103,24 @@ def test_snowflake_survives_json_roundtrip_without_float(tmp_path):
     assert ChannelMapping.from_dict(
         {"mesh_channel": "Public", "discord_channel_id": lossy}
     ).discord_channel_id == lossy
+
+
+def test_ids_are_persisted_as_strings(tmp_path, monkeypatch):
+    """Quoted ids survive a JS/float round-trip; bare integers do not."""
+    import json
+
+    from openhop_discord_bridge import config as cfgmod
+    from openhop_discord_bridge.server import Bridge
+
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({
+        "discord_token": "A" * 24 + "." + "B" * 6 + "." + "C" * 40,
+        "channels": [{"mesh_channel": "Public", "discord_channel_id": 1,
+                      "allowed_user_ids": [365689347485204482]}],
+    }))
+    monkeypatch.setattr(cfgmod, "config_path", lambda: path)
+    bridge = Bridge.__new__(Bridge)
+    bridge._persist_channel_ids({"Public": 1571423335894749224})
+    data = json.loads(path.read_text())
+    assert data["channels"][0]["discord_channel_id"] == "1571423335894749224"
+    assert data["channels"][0]["allowed_user_ids"] == ["365689347485204482"]
