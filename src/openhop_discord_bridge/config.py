@@ -152,6 +152,21 @@ def load_config(path: Optional[Path] = None) -> Config:
             "no Discord bot token: set 'discord_token' in config.json or DISCORD_BOT_TOKEN"
         )
 
+    # A bot token is three base64url segments separated by two dots. Catching the
+    # wrong kind of secret here turns a bare 401 at login into an actionable
+    # message: openHop API keys and most other secrets are dotless 64-char hex.
+    token = token.strip()
+    if token.count(".") != 2 or len(token) < 59:
+        shape = "64-char hex (looks like an openHop API key)" if (
+            len(token) == 64 and all(c in "0123456789abcdefABCDEF" for c in token)
+        ) else f"{len(token)} chars with {token.count('.')} dot(s)"
+        raise ConfigError(
+            "discord_token does not look like a bot token: it is "
+            f"{shape}. A bot token has two dots and is ~70+ characters — copy it "
+            "from Developer Portal > your app > Bot > Reset Token, not the "
+            "application ID, client secret or a repeater API key."
+        )
+
     mappings = [ChannelMapping.from_dict(item) for item in raw.get("channels") or []]
     if not mappings:
         raise ConfigError("no channel mappings: 'channels' is empty, so there is nothing to bridge")

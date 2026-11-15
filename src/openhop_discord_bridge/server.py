@@ -16,7 +16,7 @@ from typing import Dict, Optional
 import discord
 
 from .config import ChannelMapping, Config, ConfigError, load_config
-from .discord_side import BridgeDiscord, flatten_for_mesh
+from .discord_side import BridgeDiscord, build_intents, flatten_for_mesh
 from .policy import (
     EchoGuard,
     OutboundQueue,
@@ -91,7 +91,7 @@ class Bridge:
             name="packet-tailer",
         )
 
-        intents = discord.Intents.default() | discord.Intents.message_content
+        intents = build_intents()
         self.discord = BridgeDiscord(self, intents=intents)
         self._sender_task = asyncio.create_task(self._sender_loop(), name="mesh-sender")
 

@@ -20,6 +20,19 @@ logger = logging.getLogger(__name__)
 MESH_SAFE_NEWLINES = " / "
 
 
+def build_intents() -> discord.Intents:
+    """Intents for the bridge: guilds, messages, and message *content*.
+
+    ``discord.Intents.message_content`` is a ``flag_value`` descriptor when
+    reached through the class, not an ``Intents`` instance, so ORing it into
+    ``Intents.default()`` raises ``AttributeError: 'flag_value' object has no
+    attribute 'value'``. Set the attribute on an instance instead.
+    """
+    intents = discord.Intents.default()
+    intents.message_content = True
+    return intents
+
+
 def flatten_for_mesh(text: str) -> str:
     """Group text is one line on a 128-byte channel; newlines waste the budget."""
     return " ".join(part.strip() for part in text.replace("\r", "").split("\n") if part.strip())
