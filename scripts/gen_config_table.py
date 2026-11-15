@@ -58,8 +58,9 @@ DOCS = {
     ),
     "discord_sender_name": (
         "string",
-        "`display_name` (what people see — \"Josh Hagger\") or `username` "
-        "(the handle — \"anquietas86\").",
+        "`display_name` (what people see — \"Josh Hagger\"), `username` (the "
+        "handle — \"anquietas86\"), or `none` (no speaker at all; the node prefix "
+        "still identifies the bridge).",
     ),
     "discord_sender_name_max_chars": (
         "int",

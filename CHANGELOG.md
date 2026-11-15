@@ -1,3 +1,11 @@
+# 0.5.0
+
+- **`discord_sender_name: "none"`** — a third option alongside `display_name` and
+  `username`. The body is sent bare, with no speaker prefix; the node's own name
+  prefix (`<node_name>: `) still identifies the bridge, so the message remains
+  attributable without naming the person. Saves the label's bytes too.
+- 76 tests passing.
+
 # 0.4.2
 
 - **Derived Discord channel names keep emoji.** `normalise_channel_name` stripped

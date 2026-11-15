@@ -198,3 +198,13 @@ def test_mesh_sender_label_is_capped():
     from openhop_discord_bridge.policy import mesh_sender_label as m
 
     assert len(m("A very long display name indeed", "handle", "display_name", 10)) == 10
+
+
+def test_mesh_sender_label_none_omits_speaker():
+    """`none` sends the body bare: the node prefix still identifies the bridge."""
+    from openhop_discord_bridge.policy import mesh_sender_label as m
+
+    assert m("Josh Hagger", "anquietas86", "none") == ""
+    # and the caller must then produce no prefix at all
+    prefix = render_prefix("{author}: ", "") if m("Josh", "josh", "none") else ""
+    assert prefix == ""

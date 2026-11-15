@@ -248,9 +248,9 @@ def load_config(path: Optional[Path] = None) -> Config:
         seen_mesh.add(m.mesh_channel)
 
     sender_mode = str(raw.get("discord_sender_name") or "display_name").lower()
-    if sender_mode not in ("display_name", "username"):
+    if sender_mode not in ("display_name", "username", "none"):
         raise ConfigError(
-            "discord_sender_name must be 'display_name' or 'username', "
+            "discord_sender_name must be 'display_name', 'username' or 'none', "
             f"not {sender_mode!r}"
         )
 

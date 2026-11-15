@@ -74,7 +74,7 @@ def mesh_text_budget(max_bytes: int, node_name: str) -> int:
     return max(16, max_bytes - overhead)
 
 
-SENDER_NAME_MODES = ("display_name", "username")
+SENDER_NAME_MODES = ("display_name", "username", "none")
 
 
 def mesh_sender_label(
@@ -84,8 +84,12 @@ def mesh_sender_label(
 
     ``display_name`` is the server nickname / global display name people see
     (e.g. "Josh Hagger"); ``username`` is the account handle (e.g.
-    "anquietas86"). The name spends the mesh byte budget, so it is capped.
+    "anquietas86"); ``none`` omits the speaker entirely and returns an empty
+    string, which the caller must treat as "no prefix" rather than rendering an
+    empty template. The name spends the mesh byte budget, so it is capped.
     """
+    if (mode or "").lower() == "none":
+        return ""
     chosen = username if (mode or "").lower() == "username" else display_name
     label = " ".join((chosen or "").split())
     if not label:

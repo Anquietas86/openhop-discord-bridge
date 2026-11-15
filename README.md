@@ -124,7 +124,7 @@ from `DISCORD_BOT_TOKEN`, which keeps it out of any file you might share.
 | `discord_channel_prefix` | string | (empty) | Prefix for channel names derived from mesh channel names (`mesh-` gives `mesh-public`). |
 | `discord_guild_id` | string | (empty) | Guild id. Null means "the only guild the bot is in". Quote it — see the snowflake note below. |
 | `link_check_seconds` | float | `15.0` | Companion health check. After a repeater restart the link is half-closed while inbound keeps working, so this reconnects and re-provisions. |
-| `discord_sender_name` | string | `"display_name"` | `display_name` (what people see — "Josh Hagger") or `username` (the handle — "anquietas86"). |
+| `discord_sender_name` | string | `"display_name"` | `display_name` (what people see — "Josh Hagger"), `username` (the handle — "anquietas86"), or `none` (no speaker at all; the node prefix still identifies the bridge). |
 | `discord_sender_name_max_chars` | int | `24` | Cap on that label, since it spends the byte budget. |
 
 ### Channel mapping (`channels[]` entries)

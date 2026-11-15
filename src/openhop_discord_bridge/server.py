@@ -312,7 +312,10 @@ class Bridge:
             self.config.discord_sender_name,
             self.config.discord_sender_name_max_chars,
         )
-        prefix = render_prefix(template, label)
+        # With discord_sender_name=none there is no speaker label: send the body
+        # bare rather than rendering "{author}: " into ": hello". The node still
+        # prefixes its own name, so the message remains attributable to the bridge.
+        prefix = render_prefix(template, label) if label else ""
         # The node prepends "<node_name>: " itself, so our own text must fit the
         # remainder or the channel payload overruns its byte budget.
         budget = mesh_text_budget(self.config.max_mesh_bytes, self.config.companion_node_name)
