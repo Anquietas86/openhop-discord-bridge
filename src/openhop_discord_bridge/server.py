@@ -485,7 +485,19 @@ class Bridge:
             mesh_channel, payload = item.mesh_channel, item.text
             idx = self.link.channels.get(mesh_channel)
             if idx is None:
-                logger.error("no companion channel index for %s; dropping", mesh_channel)
+                # The companion may have been provisioned by another task, or the
+                # mapping was in flight; re-provision and look once more before
+                # declaring failure, because dropping here strands the message
+                # with only a log line (the user sees the queued tick forever).
+                try:
+                    await self.link.provision_channels(self._channel_keys())
+                    idx = self.link.channels.get(mesh_channel)
+                except Exception:  # noqa: BLE001
+                    logger.warning("could not refresh companion channels", exc_info=True)
+            if idx is None:
+                logger.error("no companion channel index for %s; giving up", mesh_channel)
+                self._pending_echo.take(item.text)
+                await self._react(item, REACT_FAILED)
                 continue
             try:
                 if not self.link.connected:

@@ -252,7 +252,14 @@ class PacketTailer:
                         logger.exception("handler failed for packet %s", message.packet_id)
                 failures = 0
             except FileNotFoundError:
-                logger.error("repeater database disappeared: %s", self.db_path)
+                failures += 1
+                # Throttled like any other failure: a wrong path would otherwise
+                # emit ~43k log lines a day and never escalate.
+                if failures == 1 or failures % 60 == 0:
+                    logger.error(
+                        "repeater database disappeared: %s (%d consecutive)",
+                        self.db_path, failures,
+                    )
             except Exception:  # noqa: BLE001 - never kill the tail loop
                 failures += 1
                 # Log the first failure loudly, then every 60th, so a locked or

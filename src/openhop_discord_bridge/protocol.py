@@ -302,11 +302,17 @@ class CompanionClient:
         The node persists what it is given, so this doubles as provisioning for a
         fresh companion: no repeater restart and no direct database writes.
         """
-        self.channels.clear()
-        for idx, (name, key) in enumerate(channels.items()):
-            await self.request(cmd_set_channel(idx, name, key), {RESP_OK})
-            self.channels[name] = idx
-            logger.info("provisioned channel %s at index %d", name, idx)
+        # Build the mapping first, then swap it in with a single assignment.
+        # Clearing the live dict and repopulating it across many awaits let
+        # _sender_loop read a half-built map during a reconnect and drop the
+        # message it was holding (idx is None).
+        async with self._lifecycle:
+            resolved: Dict[str, int] = {}
+            for idx, (name, key) in enumerate(channels.items()):
+                await self.request(cmd_set_channel(idx, name, key), {RESP_OK})
+                resolved[name] = idx
+                logger.info("provisioned channel %s at index %d", name, idx)
+            self.channels = resolved
 
     async def read_channels(self, limit: int = 40) -> Dict[str, int]:
         found: Dict[str, int] = {}

@@ -305,7 +305,12 @@ def load_config(path: Optional[Path] = None) -> Config:
     if not mappings:
         raise ConfigError("no channel mappings: 'channels' is empty, so there is nothing to bridge")
 
-    autoprovision = bool(raw.get("discord_autoprovision", False))
+    # MUST go through _as_bool: bool("false") is True, and this value gates
+    # validation. Parsed differently from the Config field, a stringified flag
+    # would let a mapping with no discord_channel_id pass validation while
+    # runtime autoprovision was False — the bridge would then silently drop
+    # every mesh message, having "validated" the config.
+    autoprovision = _as_bool(raw.get("discord_autoprovision"), "discord_autoprovision", False)
     for m in mappings:
         if m.discord_channel_id is None and not autoprovision:
             raise ConfigError(
@@ -365,7 +370,7 @@ def load_config(path: Optional[Path] = None) -> Config:
         mesh_sender_marker=str(raw.get("mesh_sender_marker") or ""),
         start_from_latest=_as_bool(raw.get("start_from_latest"), "start_from_latest", True),
         log_level=str(raw.get("log_level") or "INFO").upper(),
-        discord_autoprovision=_as_bool(raw.get("discord_autoprovision"), "discord_autoprovision", False),
+        discord_autoprovision=autoprovision,
         discord_category_name=str(raw.get("discord_category_name") or "\U0001f4ac | Meshcore"),
         discord_channel_prefix=str(raw.get("discord_channel_prefix") or ""),
         discord_guild_id=(

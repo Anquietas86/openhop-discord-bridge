@@ -1,3 +1,30 @@
+# 0.8.1 — second review pass
+
+A second reviewer (a different vendor's frontier general model, given the first
+pass's findings as exclusions) found four defects that survived the first round.
+
+- **`discord_autoprovision` was parsed two different ways.** The validation gate
+  used `bool(raw.get(...))` while the runtime field used the strict parser, so
+  `"false"` (stringified by a settings UI) passed validation — accepting mappings
+  with no `discord_channel_id` — while runtime autoprovision was off. The bridge
+  then dropped every mesh message, having "validated" the config. This is the same
+  defect class as 0.8.0's `bool("false")` fix, in a line the first pass missed.
+- **`provision_channels` cleared the live channel map before rebuilding it.** Both
+  the sender loop and the link supervisor read that map during a reconnect, so a
+  message could see `idx is None` and be dropped. The map is now built privately
+  and swapped in with a single assignment under the lifecycle lock.
+- **A missing channel index stranded messages.** The queue entry was discarded with
+  only a log line, leaving the user's message showing the queued tick forever.
+  Now it re-provisions and retries the lookup once, then marks the message failed.
+- **`FileNotFoundError` logged every poll interval** (~43k lines/day for a wrong
+  path) while other failures were throttled. Now throttled identically.
+
+The same reviewer explicitly examined the allowlist path and the AES/HMAC decode
+path and found no bypass or exploit path, citing the specific guards — recorded
+here because "reviewed and sound" is evidence too.
+
+Tests: 129 -> 135 (`tests/test_second_review.py`).
+
 # 0.8.0 — independent review findings
 
 An external reviewer (a different model, given only the source and the threat
