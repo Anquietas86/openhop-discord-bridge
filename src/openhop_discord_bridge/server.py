@@ -21,6 +21,7 @@ from .policy import (
     EchoGuard,
     OutboundQueue,
     TokenBucket,
+    mesh_text_budget,
     render_prefix,
     truncate_mesh_text,
 )
@@ -165,7 +166,10 @@ class Bridge:
         text = flatten_for_mesh(message.clean_content) or "[attachment]"
         template = mapping.prefix_template or self.config.mesh_prefix_template
         prefix = render_prefix(template, message.author.display_name)
-        payload = truncate_mesh_text(prefix, text, self.config.max_mesh_bytes)
+        # The node prepends "<node_name>: " itself, so our own text must fit the
+        # remainder or the channel payload overruns its byte budget.
+        budget = mesh_text_budget(self.config.max_mesh_bytes, self.config.companion_node_name)
+        payload = truncate_mesh_text(prefix, text, budget)
 
         if not self.bucket.try_take(mapping.mesh_channel):
             wait = self.bucket.retry_after(mapping.mesh_channel)

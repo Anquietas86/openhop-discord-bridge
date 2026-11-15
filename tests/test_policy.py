@@ -111,3 +111,22 @@ class pytest_raises:
         if exc_type is None:
             raise AssertionError(f"{self.exc.__name__} not raised")
         return issubclass(exc_type, self.exc)
+
+
+def test_mesh_budget_subtracts_node_name_prefix():
+    """The repeater prepends "<node_name>: " itself; our text must fit the rest."""
+    from openhop_discord_bridge.policy import mesh_text_budget
+
+    assert mesh_text_budget(128, "Discord Bridge") == 128 - 16
+    assert mesh_text_budget(128, "") == 126
+    assert mesh_text_budget(20, "A very long companion node name") == 16  # floor
+
+
+def test_payload_plus_node_prefix_stays_within_budget():
+    from openhop_discord_bridge.policy import mesh_text_budget, truncate_mesh_text
+
+    for body in ("short", "x" * 500, "the quick brown fox " * 20):
+        budget = mesh_text_budget(128, "Discord Bridge")
+        payload = truncate_mesh_text("Josh: ", body, budget)
+        total = len(("Discord Bridge: " + payload).encode())
+        assert total <= 128, (total, payload[:40])

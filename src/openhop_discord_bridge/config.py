@@ -22,7 +22,8 @@ MANIFEST_DEFAULTS: Dict[str, Any] = {
     "channels": [],
     "poll_interval_seconds": 2.0,
     "max_mesh_bytes": 128,
-    "mesh_prefix_template": "[{author}] ",
+    "mesh_prefix_template": "{author}: ",
+    "companion_node_name": "Discord Bridge",
     "webhook_name": "Mesh Bridge",
     "rate_capacity": 3,
     "rate_refill_seconds": 12.0,
@@ -96,6 +97,7 @@ class Config:
     poll_interval_seconds: float
     max_mesh_bytes: int
     mesh_prefix_template: str
+    companion_node_name: str
     webhook_name: str
     rate_capacity: int
     rate_refill_seconds: float
@@ -196,7 +198,8 @@ def load_config(path: Optional[Path] = None) -> Config:
         channels=mappings,
         poll_interval_seconds=max(0.5, float(raw.get("poll_interval_seconds") or 2.0)),
         max_mesh_bytes=max_bytes,
-        mesh_prefix_template=str(raw.get("mesh_prefix_template") or "[{author}] "),
+        mesh_prefix_template=str(raw.get("mesh_prefix_template") or "{author}: "),
+        companion_node_name=str(raw.get("companion_node_name") or "Discord Bridge"),
         webhook_name=str(raw.get("webhook_name") or "Mesh Bridge"),
         rate_capacity=max(1, int(raw.get("rate_capacity") or 3)),
         rate_refill_seconds=max(0.0, float(raw.get("rate_refill_seconds") or 12.0)),

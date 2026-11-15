@@ -41,6 +41,17 @@ def truncate_mesh_text(prefix: str, body: str, max_bytes: int) -> str:
     return prefix + candidate.rstrip() + ELLIPSIS
 
 
+def mesh_text_budget(max_bytes: int, node_name: str) -> int:
+    """Bytes available for our own text once the node prepends ``"<name>: "``.
+
+    The repeater writes the companion's node name in front of every channel
+    message it transmits, so the payload we build is not the whole payload.
+    Ignoring this overflows the channel's byte budget by ``len(name) + 2``.
+    """
+    overhead = len(node_name.encode("utf-8")) + 2
+    return max(16, max_bytes - overhead)
+
+
 def render_prefix(template: str, author: str) -> str:
     try:
         return template.format(author=author)

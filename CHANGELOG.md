@@ -1,3 +1,14 @@
+# 0.1.3
+
+- Fix: the repeater prepends `<node_name>: ` to every channel message it
+  transmits, so the bridge was double-prefixing (`Discord Bridge: [Josh] hi`) and
+  overrunning the channel byte budget by `len(node_name) + 2`. The outgoing
+  budget now subtracts that overhead (`mesh_text_budget`), and the default prefix
+  is `{author}: ` instead of `[{author}] `.
+- New config `companion_node_name` (default `Discord Bridge`) feeds that maths —
+  set it to match the companion's `node_name` if you rename it.
+- Tests: 41 passing.
+
 # 0.1.2
 
 - Fix: `Client.connect()` is keyword-only and takes no token on discord.py 2.7,
