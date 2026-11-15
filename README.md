@@ -77,22 +77,101 @@ visible without reading logs:
 queued, so it means on-air rather than accepted-by-the-bridge. `📻` is derived
 from the bridge hearing its own transmission return through the packet log.
 
+## Discord setup
+
+Do this first — the plugin cannot start without a bot token and the intent.
+
+1. **New application** at <https://discord.com/developers/applications> — a
+   dedicated one, not an assistant bot you already use. The bridge posts as
+   webhooks, but it logs in as this bot.
+2. **Bot** tab → copy the token. It is shown once; a valid token has **two dots**
+   and is ~70+ characters. An openHop API key (64 hex chars, no dots) is not a
+   token and fails with a bare `401`.
+3. Same tab → **Privileged Gateway Intents** → enable **Message Content
+   Intent**. Without it the gateway refuses the connection.
+4. **Installation** tab → Guild Install → scopes must include **`bot`**, with
+   permissions `536939584` (View Channels, Read Message History, Manage
+   Webhooks, Add Reactions). Apps default to `applications.commands` only, in
+   which case the install says "added successfully" while adding **no bot user**
+   at all.
+5. Invite it to your server. It only appears in the member list once a channel
+   grants it View Channel.
+6. Note the **channel IDs** you want to bridge — Settings → Advanced →
+   Developer Mode, then right-click a channel → Copy Channel ID. They also show
+   up in the API and can be quoted as strings (see the snowflake warning below).
+
 ## Install
 
-```bash
-# On the repeater host, create the companion identity first (its own port):
-#   POST /api/create_identity  {"name":"Discord Bridge","type":"companion",
-#     "settings":{"node_name":"Discord Bridge","tcp_port":5003,"bind_address":"127.0.0.1"}}
+Everything below happens in the openHop **web dashboard** — no shell needed.
 
-python -m build --wheel
-# then install the wheel through the plugin manager:
-#   POST /api/plugins/install {"wheel_path":"/tmp/openhop_discord_bridge-0.1.0-py3-none-any.whl"}
-#   POST /api/plugins/settings {"id":"discord.bridge","config":{...}}
-#   POST /api/plugins/enable   {"id":"discord.bridge"}
+### 1. Create the bridge's companion identity
+
+**Companions** page → add a companion:
+
+| Field | Value |
+| --- | --- |
+| Node Name | `VK5JPH Discord 🤖` — this is what appears on the mesh |
+| TCP Port | `5003` (any free port; must be unique per companion) |
+| Bind Address | `127.0.0.1` — the bridge runs on the repeater host, so loopback is enough |
+
+**Do not reuse an existing companion.** A companion has one client; sharing one
+with Hermes, Home Assistant or a base station splits its traffic and makes
+attribution ambiguous. Companions do not accept client logins, so `max_clients`
+does not limit how many you can have.
+
+A new companion starts with **no channels**. The bridge provisions them from the
+repeater database on first start — only the identity needs creating by hand.
+
+### 2. Install the plugin wheel
+
+1. Download `openhop_discord_bridge-<version>-py3-none-any.whl` from
+   [Releases](https://github.com/Anquietas86/openhop-discord-bridge/releases).
+2. **Plugins** page → **Install wheel** → select the `.whl`. Only `.whl` files are
+   accepted; a `.tar.gz` or a checkout will be refused.
+3. Open the plugin and paste your configuration into **Settings** (see
+   [Configuration](#configuration)), then **Enable** it.
+
+### 3. Verify
+
+The plugin log should show, in order:
+
+```
+companion 127.0.0.1:5003 ready
+provisioned channel Public at index 0        # ... one line per channel
+Discord connected as <bot name>#1234
+packet tail starting at id <n>
 ```
 
-A fresh companion starts with no channels; the bridge provisions them from the
-repeater database at startup, so only the identity needs creating by hand.
+If it stops at the first line, the companion port or bind address is wrong. If
+it never reaches `Discord connected`, the token or the Message Content intent is
+the problem — the log says which.
+
+### Command line / API alternative
+
+For automation or a rebuild script, the same steps without the UI:
+
+```bash
+# 1. companion identity (hot-activates, no repeater restart)
+curl -s -X POST http://127.0.0.1:8000/api/create_identity \
+  -H "X-API-Key: $OPENHOP_API_KEY" -H 'Content-Type: application/json' \
+  -d '{"name":"Discord Bridge","type":"companion",
+       "settings":{"node_name":"VK5JPH Discord 🤖","tcp_port":5003,"bind_address":"127.0.0.1"}}'
+
+# 2. install + configure + enable
+curl -s -X POST http://127.0.0.1:8000/api/plugins/install \
+  -H "X-API-Key: $OPENHOP_API_KEY" -H 'Content-Type: application/json' \
+  -d '{"wheel_path":"/tmp/openhop_discord_bridge-0.6.0-py3-none-any.whl"}'
+curl -s -X POST http://127.0.0.1:8000/api/plugins/settings \
+  -H "X-API-Key: $OPENHOP_API_KEY" -H 'Content-Type: application/json' \
+  -d '{"id":"discord.bridge","restart":true,"config":{ }}'
+curl -s -X POST http://127.0.0.1:8000/api/plugins/enable \
+  -H "X-API-Key: $OPENHOP_API_KEY" -H 'Content-Type: application/json' \
+  -d '{"id":"discord.bridge"}'
+```
+
+The API key is on the **Configuration** page of the repeater dashboard. Note the
+manager returns HTTP 200 with `{"success": false}` in the body when a call is
+refused, so check the JSON field and not just the status code.
 
 ## Configuration
 
@@ -166,13 +245,6 @@ Minimal example:
 
 Unmapped channels are ignored in both directions. `mesh_to_discord` and
 `discord_to_mesh` are independent, so a channel can be mirrored read-only.
-
-## Discord setup
-
-1. New application + bot (**not** an existing assistant bot), enable the
-   **Message Content** intent.
-2. Invite it with View Channels, Read Message History, Manage Webhooks.
-3. Map each mesh channel to a Discord channel by ID.
 
 ## Development
 

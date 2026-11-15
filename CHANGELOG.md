@@ -1,3 +1,17 @@
+# 0.6.1
+
+- **README install path is now the web dashboard**, matching how it is actually
+  done: create the companion on the Companions page, upload the wheel with
+  **Plugins -> Install wheel**, configure in Settings, enable. The CLI/API flow
+  moved to an "alternative" subsection rather than being the default.
+- **Discord app setup moved ahead of Install.** It was after the install steps
+  although the token and Message Content intent are needed before the plugin can
+  start at all.
+- Adds the two install traps seen in practice: apps defaulting to
+  `applications.commands` (installs "successfully" with no bot user), and
+  `max_clients` not limiting companions.
+- 78 tests passing.
+
 # 0.6.0
 
 - **Per-channel `sender_name`**: a mapping may override `discord_sender_name`
