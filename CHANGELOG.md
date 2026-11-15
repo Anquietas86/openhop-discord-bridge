@@ -1,3 +1,23 @@
+# 0.8.4 — generic placeholders in the docs
+
+The published repo should read as a tool for anyone, not a write-up of one
+installation.
+
+- **README uses generic names**: `VK0ABC Discord` for the companion node,
+  "Alex Smith" / "alexsmith" for the display-name and handle examples, and
+  `1234567890123456789` for the snowflake in the precision warning (with the
+  mangled form corrected to `...456768` — the previous text mixed two different
+  ids).
+- **Default `discord_category_name` is now `Mesh Bridge`** instead of a name
+  specific to the author's server. Existing configs are unaffected: the value is
+  stored in `config.json`, which wins over the manifest default.
+- **Test fixtures and docstrings** no longer carry the author's callsign, name or
+  local channel names, since the whole tree is public.
+- **The config table renders non-ASCII defaults properly.** `json.dumps` escapes
+  by default, so an emoji default appeared as a literal `\ud83d\udcac`.
+- The generator now owns those placeholders, so a rebuild cannot reintroduce the
+  personal examples.
+
 # 0.8.3 — documentation for public users
 
 The project was announced in the SA Mesh Users Discord, so the README matters as

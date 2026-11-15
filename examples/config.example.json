@@ -5,7 +5,7 @@
   "companion_node_name": "Discord Bridge",
   "repeater_db_path": "/var/lib/openhop_repeater/repeater.db",
   "discord_autoprovision": true,
-  "discord_category_name": "💬 | Meshcore",
+  "discord_category_name": "💬 | Mesh Bridge",
   "discord_sender_name": "display_name",
   "escape_markdown": true,
   "mesh_sender_marker": "",
@@ -18,7 +18,7 @@
       "discord_to_mesh": false
     },
     {
-      "mesh_channel": "Adelaide Chat",
+      "mesh_channel": "Local Chat",
       "discord_channel_id": "",
       "mesh_to_discord": true,
       "discord_to_mesh": true,

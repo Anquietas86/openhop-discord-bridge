@@ -110,7 +110,7 @@ Everything below happens in the openHop **web dashboard** — no shell needed.
 
 | Field | Value |
 | --- | --- |
-| Node Name | `VK5JPH Discord 🤖` — this is what appears on the mesh |
+| Node Name | `VK0ABC Discord 🤖` — this is what appears on the mesh |
 | TCP Port | `5003` (any free port; must be unique per companion) |
 | Bind Address | `127.0.0.1` — the bridge runs on the repeater host, so loopback is enough |
 
@@ -155,7 +155,7 @@ For automation or a rebuild script, the same steps without the UI:
 curl -s -X POST http://127.0.0.1:8000/api/create_identity \
   -H "X-API-Key: $OPENHOP_API_KEY" -H 'Content-Type: application/json' \
   -d '{"name":"Discord Bridge","type":"companion",
-       "settings":{"node_name":"VK5JPH Discord 🤖","tcp_port":5003,"bind_address":"127.0.0.1"}}'
+       "settings":{"node_name":"VK0ABC Discord 🤖","tcp_port":5003,"bind_address":"127.0.0.1"}}'
 
 # 2. install + configure + enable
 curl -s -X POST http://127.0.0.1:8000/api/plugins/install \
@@ -201,11 +201,11 @@ from `DISCORD_BOT_TOKEN`, which keeps it out of any file you might share.
 | `log_level` | string | `"INFO"` | `DEBUG`, `INFO`, `WARNING` or `ERROR`. |
 | `companion_node_name` | string | `"Discord Bridge"` | Must match the companion's `node_name` in the repeater config. Used for the byte-budget overhead and as the prefix stripped when detecting echoes. |
 | `discord_autoprovision` | bool | `false` | Create the category and a channel per mapping on start. Needs **Manage Channels**. |
-| `discord_category_name` | string | `"\ud83d\udcac | Meshcore"` | Category to create or reuse for the bridge's channels. |
+| `discord_category_name` | string | `"Mesh Bridge"` | Category to create or reuse for the bridge's channels. |
 | `discord_channel_prefix` | string | (empty) | Prefix for channel names derived from mesh channel names (`mesh-` gives `mesh-public`). |
 | `discord_guild_id` | string | (empty) | Guild id. Null means "the only guild the bot is in". Quote it — see the snowflake note below. |
 | `link_check_seconds` | float | `15.0` | Companion health check. After a repeater restart the link is half-closed while inbound keeps working, so this reconnects and re-provisions. |
-| `discord_sender_name` | string | `"display_name"` | `display_name` (what people see — "Josh Hagger"), `username` (the handle — "anquietas86"), or `none` (no speaker at all; the node prefix still identifies the bridge). |
+| `discord_sender_name` | string | `"display_name"` | `display_name` (what people see — "Alex Smith"), `username` (the handle — "alexsmith"), or `none` (no speaker at all; the node prefix still identifies the bridge). |
 | `discord_sender_name_max_chars` | int | `24` | Cap on that label, since it spends the byte budget. |
 | `inbound_burst` | int | `12` | Mesh -> Discord burst per channel. A mesh flood must not become a Discord flood; Discord rate-limits webhooks at about 5 posts per 2s. |
 | `inbound_refill_seconds` | float | `2.0` | Seconds per token refill for inbound traffic, per channel. |
@@ -230,7 +230,7 @@ from `DISCORD_BOT_TOKEN`, which keeps it out of any file you might share.
 
 > **Quote every id.** Discord snowflakes are ~1.57e18 and exceed float64
 > precision. An openHop settings save round-trips this JSON through JavaScript,
-> which rewrites `1571423335894749224` as `1571423335894749200` — silently
+> which rewrites `1234567890123456789` as `1234567890123456768` — silently
 > breaking every mapping. Stored as strings they cannot be damaged. Existing
 > integer ids are converted on the next start.
 
@@ -243,7 +243,7 @@ Minimal example:
   "channels": [
     {
       "mesh_channel": "Public",
-      "discord_channel_id": "1571423335894749224",
+      "discord_channel_id": "1234567890123456789",
       "mesh_to_discord": true,
       "discord_to_mesh": false
     }

@@ -156,7 +156,7 @@ def test_webhook_username_strips_discord_brand():
     """Discord rejects webhook usernames containing its own name (400/50035)."""
     from openhop_discord_bridge.policy import sanitise_webhook_username as s
 
-    assert s("VK5JPH Discord \U0001f916") == "VK5JPH \U0001f916"
+    assert s("VK0ABC Discord \U0001f916") == "VK0ABC \U0001f916"
     assert s("discord") == "mesh"
     assert s("Discord Bridge") == "Bridge"
     assert s("clyde bot") == "bot"
@@ -176,9 +176,9 @@ def test_echo_matches_after_node_name_prefix():
     """The node prepends '<node_name>: ', so a literal match never happens."""
     clock = FakeClock(1000.0)
     guard = EchoGuard(ttl_seconds=60, clock=clock)
-    guard.remember("Josh Hagger: !test")
-    assert guard.is_echo("Josh Hagger: !test")
-    assert guard.is_echo("VK5JPH Discord \U0001f916: Josh Hagger: !test")
+    guard.remember("Alex Smith: !test")
+    assert guard.is_echo("Alex Smith: !test")
+    assert guard.is_echo("VK0ABC Discord \U0001f916: Alex Smith: !test")
     assert not guard.is_echo("Ranga: hello")
 
 
@@ -186,11 +186,11 @@ def test_mesh_sender_label_modes():
     """display_name = what people see; username = the account handle."""
     from openhop_discord_bridge.policy import mesh_sender_label as m
 
-    assert m("Josh Hagger", "anquietas86") == "Josh Hagger"
-    assert m("Josh Hagger", "anquietas86", "display_name") == "Josh Hagger"
-    assert m("Josh Hagger", "anquietas86", "username") == "anquietas86"
+    assert m("Alex Smith", "alexsmith") == "Alex Smith"
+    assert m("Alex Smith", "alexsmith", "display_name") == "Alex Smith"
+    assert m("Alex Smith", "alexsmith", "username") == "alexsmith"
     # a missing display name falls back to the handle rather than "None"
-    assert m("", "anquietas86") == "anquietas86"
+    assert m("", "alexsmith") == "alexsmith"
     assert m("", "") == "discord"
 
 
@@ -204,7 +204,7 @@ def test_mesh_sender_label_none_omits_speaker():
     """`none` sends the body bare: the node prefix still identifies the bridge."""
     from openhop_discord_bridge.policy import mesh_sender_label as m
 
-    assert m("Josh Hagger", "anquietas86", "none") == ""
+    assert m("Alex Smith", "alexsmith", "none") == ""
     # and the caller must then produce no prefix at all
     prefix = render_prefix("{author}: ", "") if m("Josh", "josh", "none") else ""
     assert prefix == ""

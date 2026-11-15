@@ -122,11 +122,11 @@ def test_post_uses_sanitised_username():
 
     async def scenario():
         client.get_channel = lambda cid: channel if cid == 11 else None
-        await client.post_mesh_message(11, "VK5JPH Discord \U0001f916", "hello")
+        await client.post_mesh_message(11, "VK0ABC Discord \U0001f916", "hello")
 
     asyncio.run(scenario())
     assert channel.hook.sent, "nothing was posted"
-    assert channel.hook.sent[0]["username"] == "VK5JPH 🤖"
+    assert channel.hook.sent[0]["username"] == "VK0ABC 🤖"
     mentions = channel.hook.sent[0]["allowed_mentions"]
     assert mentions.everyone is False and mentions.roles is False and mentions.users is False
 

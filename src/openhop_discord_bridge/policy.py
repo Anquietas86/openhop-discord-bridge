@@ -22,7 +22,7 @@ RESERVED_USERNAMES = {"everyone", "here", "mesh"}
 def sanitise_webhook_username(name: str, fallback: str = "mesh") -> str:
     """Make a mesh sender name acceptable as a Discord webhook username.
 
-    A mesh node called "VK5JPH Discord" would otherwise fail every post with a
+    A mesh node called "VK0ABC Discord" would otherwise fail every post with a
     400, so the brand word is stripped rather than the message dropped.
     """
     out = name or ""
@@ -83,7 +83,7 @@ def mesh_sender_label(
     """How a Discord speaker is labelled on the mesh.
 
     ``display_name`` is the server nickname / global display name people see
-    (e.g. "Josh Hagger"); ``username`` is the account handle (e.g.
+    (e.g. "Alex Smith"); ``username`` is the account handle (e.g.
     "anquietas86"); ``none`` omits the speaker entirely and returns an empty
     string, which the caller must treat as "no prefix" rather than rendering an
     empty template. The name spends the mesh byte budget, so it is capped.

@@ -78,12 +78,12 @@ def _make_db(path, rows):
 
 def test_tailer_reads_new_rows_once(tmp_path):
     db = tmp_path / "repeater.db"
-    payload = encrypt(SECRET, "Adelaide Chat: test")
+    payload = encrypt(SECRET, "Local Chat: test")
     _make_db(db, [(10, 0.0, 5, payload, 0)])
 
     tailer = r.PacketTailer(db, {"Public": [SECRET]}, start_from_latest=False)
     first = tailer.fetch_new()
-    assert [m.text for m in first] == ["Adelaide Chat: test"]
+    assert [m.text for m in first] == ["Local Chat: test"]
     assert first[0].packet_id == 10
     assert tailer.fetch_new() == []
 

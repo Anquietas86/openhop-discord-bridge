@@ -40,7 +40,7 @@ MANIFEST_DEFAULTS: Dict[str, Any] = {
     "start_from_latest": True,
     "log_level": "INFO",
     "discord_autoprovision": False,
-    "discord_category_name": "\U0001f4ac | Meshcore",
+    "discord_category_name": "Mesh Bridge",
     "discord_channel_prefix": "",
     "discord_guild_id": None,
 }
@@ -113,7 +113,7 @@ def normalise_channel_name(name: str) -> str:
     """Discord channel name for a mesh channel: lowercase, spaces to dashes.
 
     Emoji and other symbols are PRESERVED. Discord accepts them in channel names
-    (``#🛰-sarg`` is valid), and stripping them silently geed the mapping of a
+    (``#🛰-club`` is valid), and stripping them silently geed the mapping of a
     channel someone had deliberately named with an emoji. Only characters Discord
     rejects are dropped: punctuation, and anything that is not a letter, digit,
     dash, underscore, symbol or combining mark.
@@ -236,7 +236,7 @@ class Config:
     start_from_latest: bool
     log_level: str
     discord_autoprovision: bool = False
-    discord_category_name: str = "\U0001f4ac | Meshcore"
+    discord_category_name: str = "Mesh Bridge"
     discord_channel_prefix: str = ""
     discord_guild_id: Optional[int] = None
 
@@ -374,7 +374,7 @@ def load_config(path: Optional[Path] = None) -> Config:
         start_from_latest=_as_bool(raw.get("start_from_latest"), "start_from_latest", True),
         log_level=str(raw.get("log_level") or "INFO").upper(),
         discord_autoprovision=autoprovision,
-        discord_category_name=str(raw.get("discord_category_name") or "\U0001f4ac | Meshcore"),
+        discord_category_name=str(raw.get("discord_category_name") or "Mesh Bridge"),
         discord_channel_prefix=str(raw.get("discord_channel_prefix") or ""),
         discord_guild_id=(
             _as_int(raw.get("discord_guild_id"), "discord_guild_id", 0) or None

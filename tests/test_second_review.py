@@ -49,7 +49,7 @@ async def test_provisioning_never_exposes_a_half_built_channel_map():
     """A reader must never see `channels` empty or partial mid-provision."""
     client = CompanionClient.__new__(CompanionClient)
     client._lifecycle = asyncio.Lock()
-    client.channels = {"Public": 0, "Adelaide Chat": 1}
+    client.channels = {"Public": 0, "Local Chat": 1}
 
     observed = []
 
@@ -63,10 +63,10 @@ async def test_provisioning_never_exposes_a_half_built_channel_map():
 
     proto_cmd = proto.cmd_set_channel
 
-    await client.provision_channels({"Public": b"k" * 16, "Adelaide Chat": b"k" * 16})
+    await client.provision_channels({"Public": b"k" * 16, "Local Chat": b"k" * 16})
 
     assert all(len(snapshot) == 2 for snapshot in observed), f"partial map seen: {observed}"
-    assert client.channels == {"Public": 0, "Adelaide Chat": 1}
+    assert client.channels == {"Public": 0, "Local Chat": 1}
     assert proto_cmd is not None
 
 

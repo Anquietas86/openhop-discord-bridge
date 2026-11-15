@@ -58,8 +58,8 @@ DOCS = {
     ),
     "discord_sender_name": (
         "string",
-        "`display_name` (what people see — \"Josh Hagger\"), `username` (the "
-        "handle — \"anquietas86\"), or `none` (no speaker at all; the node prefix "
+        "`display_name` (what people see — \"Alex Smith\"), `username` (the "
+        "handle — \"alexsmith\"), or `none` (no speaker at all; the node prefix "
         "still identifies the bridge).",
     ),
     "discord_sender_name_max_chars": (
@@ -154,7 +154,7 @@ lines = ["| Key | Type | Default | Notes |", "| --- | --- | --- | --- |"]
 for key in manifest:
     kind, note = DOCS[key]
     default = manifest[key]
-    shown = "(empty)" if default in ("", [], None) else f"`{json.dumps(default)}`"
+    shown = "(empty)" if default in ("", [], None) else f"`{json.dumps(default, ensure_ascii=False)}`"
     lines.append(f"| `{key}` | {kind} | {shown} | {note} |")
 table = "\n".join(lines)
 
@@ -178,7 +178,7 @@ from `DISCORD_BOT_TOKEN`, which keeps it out of any file you might share.
 
 > **Quote every id.** Discord snowflakes are ~1.57e18 and exceed float64
 > precision. An openHop settings save round-trips this JSON through JavaScript,
-> which rewrites `1571423335894749224` as `1571423335894749200` — silently
+> which rewrites `1234567890123456789` as `1234567890123456768` — silently
 > breaking every mapping. Stored as strings they cannot be damaged. Existing
 > integer ids are converted on the next start.
 
@@ -191,7 +191,7 @@ Minimal example:
   "channels": [
     {{
       "mesh_channel": "Public",
-      "discord_channel_id": "1571423335894749224",
+      "discord_channel_id": "1234567890123456789",
       "mesh_to_discord": true,
       "discord_to_mesh": false
     }}

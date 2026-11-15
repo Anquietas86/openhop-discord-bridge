@@ -34,7 +34,7 @@ def cfg_file(tmp_path, **overrides):
     [
         ("Public", "public"),
         ("#hamradio", "hamradio"),
-        ("Adelaide Chat", "adelaide-chat"),
+        ("Local Chat", "local-chat"),
         ("Hagger Family", "hagger-family"),
         ("#sa mesh meet 2026", "sa-mesh-meet-2026"),
         ("#alertsa", "alertsa"),
@@ -121,11 +121,11 @@ def test_sender_name_mode_default_and_override(tmp_path):
 @pytest.mark.parametrize(
     "raw,expected",
     [
-        ("🛰 SARG", "🛰-sarg"),
+        ("🛰 Club", "🛰-club"),
         ("WarMobile🏎️", "warmobile🏎️"),   # emoji + variation selector
         ("☕", "☕"),
         (".😊.", "😊"),
-        ("Adelaide Chat", "adelaide-chat"),
+        ("Local Chat", "local-chat"),
     ],
 )
 def test_discord_channel_names_keep_emoji(raw, expected):
@@ -146,13 +146,13 @@ def test_per_channel_sender_name_override(tmp_path):
         channels=[
             {"mesh_channel": "Public"},
             {"mesh_channel": "#test", "sender_name": "none"},
-            {"mesh_channel": "SARG", "discord_sender_name": "display_name"},
+            {"mesh_channel": "Club", "discord_sender_name": "display_name"},
         ],
     )
     cfg = load_config(path)
     assert cfg.discord_sender_name == "username"
     by_mesh = {m.mesh_channel: m.sender_name for m in cfg.channels}
-    assert by_mesh == {"Public": None, "#test": "none", "SARG": "display_name"}
+    assert by_mesh == {"Public": None, "#test": "none", "Club": "display_name"}
 
 
 def test_per_channel_sender_name_validated(tmp_path):

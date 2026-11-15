@@ -129,14 +129,14 @@ def test_stranger_cannot_transmit(tmp_path):
 def test_allowlisted_user_transmits(tmp_path):
     bridge = make_bridge(tmp_path)
     bridge.discord = FakeDiscord(1571423335894749224)
-    msg = FakeMessage(FakeAuthor(JOSH, name="anquietas86", display="Josh"), 1571423335894749224, "hello")
+    msg = FakeMessage(FakeAuthor(JOSH, name="alexsmith", display="Josh"), 1571423335894749224, "hello")
 
     asyncio.run(bridge.handle_discord_message(msg))
 
     assert len(bridge.queue) == 1
     item = bridge.queue.get()
     assert item.mesh_channel == "Public"
-    assert item.text == "anquietas86: hello" or item.text == "Josh: hello"
+    assert item.text == "alexsmith: hello" or item.text == "Josh: hello"
 
 
 def test_role_allowlist_transmits_without_user_entry(tmp_path):

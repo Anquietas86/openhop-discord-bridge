@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openhop-discord-bridge"
-version = "0.8.3"
+version = "0.8.4"
 description = "Two-way MeshCore <-> Discord channel bridge as an openHop Repeater plugin"
 readme = "README.md"
 requires-python = ">=3.10"

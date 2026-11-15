@@ -54,9 +54,9 @@ def test_cmd_set_channel_rejects_wrong_key_size():
 
 
 def test_parse_channel_info():
-    body = bytes([4]) + b"Adelaide Chat".ljust(32, b"\x00")
+    body = bytes([4]) + b"Local Chat".ljust(32, b"\x00")
     info = p.parse_channel_info(body)
-    assert info == {"channel_idx": 4, "name": "Adelaide Chat"}
+    assert info == {"channel_idx": 4, "name": "Local Chat"}
 
 
 def test_parse_channel_info_short_body():
