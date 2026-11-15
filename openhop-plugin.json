@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "discord.bridge",
+  "name": "Discord Bridge",
+  "version": "0.1.0",
+  "description": "Two-way bridge between MeshCore channels and Discord channels, using a dedicated companion identity on its own TCP port.",
+  "runtime": {
+    "type": "python",
+    "entrypoint": "openhop-discord-bridge"
+  },
+  "config": {
+    "defaults": {
+      "discord_token": "",
+      "companion_host": "127.0.0.1",
+      "companion_port": 5003,
+      "companion_app_name": "discord-bridge",
+      "repeater_db_path": "/var/lib/openhop_repeater/repeater.db",
+      "channels": [],
+      "poll_interval_seconds": 2.0,
+      "max_mesh_bytes": 128,
+      "mesh_prefix_template": "[{author}] ",
+      "webhook_name": "Mesh Bridge",
+      "rate_capacity": 3,
+      "rate_refill_seconds": 12.0,
+      "echo_ttl_seconds": 120,
+      "start_from_latest": true,
+      "log_level": "INFO"
+    }
+  }
+}
