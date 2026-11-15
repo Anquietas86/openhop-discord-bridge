@@ -94,6 +94,10 @@ def split_frames(buffer: bytes) -> tuple[List[bytes], bytes]:
         if view[0] != FRAME_FROM_NODE:
             raise CompanionError(f"unexpected start byte 0x{view[0]:02x}")
         length = struct.unpack("<H", view[1:3])[0]
+        if length == 0:
+            # A zero-length payload has no command byte; indexing it would raise
+            # IndexError and tear down an otherwise healthy link.
+            raise CompanionError("zero-length frame")
         if length > MAX_FRAME_SIZE:
             raise CompanionError(f"implausible frame length {length}")
         if len(view) < 3 + length:
@@ -175,6 +179,8 @@ class CompanionClient:
         self._reply_q: asyncio.Queue[Frame] = asyncio.Queue()
         self._lock = asyncio.Lock()
         self._closed = asyncio.Event()
+        self._lifecycle = asyncio.Lock()
+        self._generation = 0
         self.channels: Dict[str, int] = {}
 
     # ── lifecycle ──────────────────────────────────────────────────────
@@ -192,18 +198,26 @@ class CompanionClient:
         )
 
     async def open(self, timeout: float = 10.0) -> None:
-        self._reader, self._writer = await asyncio.wait_for(
-            asyncio.open_connection(self.host, self.port), timeout=timeout
-        )
-        self._closed.clear()
-        self._read_task = asyncio.create_task(self._read_loop(), name="companion-reader")
+        async with self._lifecycle:
+            if self.connected:
+                return
+            self._reader, self._writer = await asyncio.wait_for(
+                asyncio.open_connection(self.host, self.port), timeout=timeout
+            )
+            self._generation += 1
+            generation = self._generation
+            self._closed.clear()
+            self._read_task = asyncio.create_task(
+                self._read_loop(generation), name="companion-reader"
+            )
         frame = await self.request(cmd_app_start(self.app_name), {RESP_SELF_INFO}, timeout=timeout)
         if frame.code != RESP_SELF_INFO:
             raise CompanionError(f"APP_START failed: {frame.error_text() or frame.code}")
         logger.info("companion %s:%s ready", self.host, self.port)
 
     async def close(self) -> None:
-        self._closed.set()
+        async with self._lifecycle:
+            self._closed.set()
         if self._read_task is not None:
             self._read_task.cancel()
             try:
@@ -223,7 +237,7 @@ class CompanionClient:
     async def wait_closed(self) -> None:
         await self._closed.wait()
 
-    async def _read_loop(self) -> None:
+    async def _read_loop(self, generation: int) -> None:
         buffer = b""
         assert self._reader is not None
         try:
@@ -247,7 +261,10 @@ class CompanionClient:
         except Exception as exc:  # noqa: BLE001 - surface as a closed link
             logger.warning("companion read loop ended: %s", exc)
         finally:
-            self._closed.set()
+            # Only the loop belonging to the CURRENT connection may declare the
+            # link down; an orphaned loop from a replaced connection must not.
+            if generation == self._generation:
+                self._closed.set()
 
     # ── commands ───────────────────────────────────────────────────────
     async def request(

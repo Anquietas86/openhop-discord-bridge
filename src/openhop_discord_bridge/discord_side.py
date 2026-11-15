@@ -78,10 +78,42 @@ class BridgeDiscord(discord.Client):
         if channel is None:
             logger.warning("Discord channel %s is not visible to the bot", channel_id)
             return
-        hook = await self.webhook_for(channel)
-        await hook.send(
-            content=text,
-            username=sanitise_webhook_username(author),
-            allowed_mentions=discord.AllowedMentions.none(),
-            wait=False,
-        )
+
+        bridge = getattr(self, "bridge", None)
+        settings = getattr(bridge, "config", None)
+        escape = getattr(settings, "escape_markdown", True)
+        marker = getattr(settings, "mesh_sender_marker", "")
+
+        body = text
+        if escape:
+            # Mesh text is attacker-controlled: without escaping it renders live
+            # markdown (masked links, fake quotes/formatting).
+            body = discord.utils.escape_markdown(text, as_needed=False)
+        name = sanitise_webhook_username(author)
+        if marker:
+            # Makes the sender's identity visibly non-Discord, so a mesh node
+            # cannot pass itself off as a server member.
+            name = sanitise_webhook_username(f"{marker}{author}")
+
+        try:
+            hook = await self.webhook_for(channel)
+            await hook.send(
+                content=body,
+                username=name,
+                allowed_mentions=discord.AllowedMentions.none(),
+                suppress_embeds=True,
+                wait=False,
+            )
+        except (discord.NotFound, discord.Forbidden):
+            # The cached webhook was deleted or had its permissions revoked;
+            # drop it and retry once so the channel does not go silent.
+            logger.warning("webhook for %s was rejected; re-creating once", channel_id)
+            self._webhooks.pop(channel_id, None)
+            hook = await self.webhook_for(channel)
+            await hook.send(
+                content=body,
+                username=name,
+                allowed_mentions=discord.AllowedMentions.none(),
+                suppress_embeds=True,
+                wait=False,
+            )

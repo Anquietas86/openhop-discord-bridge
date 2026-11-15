@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import signal
 import sqlite3
 import sys
@@ -30,7 +31,7 @@ from .policy import (
     render_prefix,
     truncate_mesh_text,
 )
-from .protocol import CompanionClient, CompanionError
+from .protocol import CompanionClient
 from .reader import MeshMessage, PacketTailer, load_channel_secrets
 
 logger = logging.getLogger("openhop_discord_bridge")
@@ -108,10 +109,15 @@ class Bridge:
         cfg = self.config
         keys = self._channel_keys()
 
-        await self.link.open()
-        # Idempotent provisioning: the node persists what it is given, so the
-        # bridge never needs a repeater restart or a direct database write.
-        await self.link.provision_channels(keys)
+        try:
+            await self.link.open()
+            # Idempotent provisioning: the node persists what it is given, so the
+            # bridge never needs a repeater restart or a direct database write.
+            await self.link.provision_channels(keys)
+        except Exception:  # noqa: BLE001 - inbound works without the link
+            # A repeater that is down at boot must not stop mesh -> Discord; the
+            # link supervisor reconnects when it returns.
+            logger.warning("companion unavailable at startup; will keep retrying", exc_info=True)
         node_channels = await self.link.read_channels(limit=len(keys) + 1)
         for name, idx in node_channels.items():
             if name not in keys:
@@ -257,8 +263,15 @@ class Bridge:
                     entry["allowed_user_ids"] = [str(x) for x in entry["allowed_user_ids"]]
                 if isinstance(entry.get("allowed_role_ids"), list):
                     entry["allowed_role_ids"] = [str(x) for x in entry["allowed_role_ids"]]
-            path.write_text(json.dumps(data, indent=2) + "\n")
-            path.chmod(0o600)
+            # Atomic: a crash mid-write must not leave truncated JSON, which
+            # would make the plugin unstartable until someone repaired the file.
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            with open(tmp, "w") as handle:
+                handle.write(json.dumps(data, indent=2) + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            tmp.chmod(0o600)
+            os.replace(tmp, path)
             logger.info("persisted %d resolved channel id(s) to %s", len(resolved), path)
         except (OSError, ValueError):
             logger.exception("could not persist resolved channel ids")
@@ -344,8 +357,8 @@ class Bridge:
         async with self._post_slots:
             try:
                 await self.discord.post_mesh_message(mapping.discord_channel_id, author, body)
-            except discord.HTTPException:
-                logger.exception("Discord rejected a mesh message for %s", mapping.mesh_channel)
+            except Exception:  # noqa: BLE001 - a fire-and-forget task must not leak
+                logger.exception("could not relay a mesh message for %s", mapping.mesh_channel)
 
     # ── Discord -> mesh ────────────────────────────────────────────────
     async def handle_discord_message(self, message: discord.Message) -> None:
@@ -419,6 +432,28 @@ class Bridge:
         except (discord.HTTPException, AttributeError):
             logger.debug("could not react %s", emoji, exc_info=True)
 
+    async def _retry_or_fail(self, item: Outbound, idx: int) -> None:
+        """Retry a failed transmission a few times before giving up.
+
+        A repeater restart or a protocol timeout used to lose the message
+        outright; three attempts with backoff covers a brief outage.
+        """
+        for attempt in range(1, self.config.tx_retries + 1):
+            await asyncio.sleep(min(2 ** attempt, 10))
+            if not self.link.connected:
+                continue
+            try:
+                await self.link.send_channel(idx, item.text.encode("utf-8"), int(time.time()))
+                logger.info("TX %s succeeded on retry %d: %s", item.mesh_channel, attempt, item.text)
+                await self._react(item, REACT_SENT)
+                return
+            except Exception:  # noqa: BLE001
+                logger.warning("TX retry %d for %s failed", attempt, item.mesh_channel, exc_info=True)
+        logger.error("giving up on %s transmission after %d attempts: %s",
+                     item.mesh_channel, self.config.tx_retries, item.text)
+        self._pending_echo.take(item.text)
+        await self._react(item, REACT_FAILED)
+
     async def _link_supervisor(self) -> None:
         """Keep the companion socket alive across repeater restarts.
 
@@ -438,7 +473,7 @@ class Bridge:
                 await self.link.provision_channels(self._channel_keys())
                 logger.info("companion link restored on %s:%s",
                             self.config.companion_host, self.config.companion_port)
-            except (CompanionError, OSError):
+            except Exception:  # noqa: BLE001 - the supervisor must never die
                 logger.warning("companion reconnect failed; will retry", exc_info=True)
 
     async def _sender_loop(self) -> None:
@@ -459,9 +494,9 @@ class Bridge:
                 await self.link.send_channel(idx, payload.encode("utf-8"), int(time.time()))
                 logger.info("TX %s (%dB): %s", mesh_channel, len(payload.encode()), payload)
                 await self._react(item, REACT_SENT)
-            except (CompanionError, OSError):
+            except Exception:  # noqa: BLE001 - one iteration must never end the loop
                 logger.exception("TX to %s failed", mesh_channel)
-                await self._react(item, REACT_FAILED)
+                await self._retry_or_fail(item, idx)
 
 
 async def _amain(config: Config) -> int:
@@ -499,7 +534,11 @@ async def _amain(config: Config) -> int:
                 )
                 await bridge.stop()
                 return 3
-            logger.error("Discord client stopped: %s", exc)
+            logger.error("Discord client stopped unexpectedly: %s", exc)
+            await bridge.stop()
+            # Non-zero: a supervisor with Restart=on-failure must retry rather
+            # than treat a dead bridge as a clean exit.
+            return 1
     await bridge.stop()
     return 0
 

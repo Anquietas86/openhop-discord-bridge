@@ -1,3 +1,62 @@
+# 0.8.0 — independent review findings
+
+An external reviewer (a different model, given only the source and the threat
+model) was asked to assume the code was buggy. It found 20 issues; all are fixed
+here. Two were regressions I introduced in 0.7.0.
+
+## Long-running correctness (highest impact)
+
+- **Both background loops died permanently on `ConfigError`.** 0.7.0 made
+  `_channel_keys()` raise `ConfigError` when the repeater DB is unreadable, but
+  `_sender_loop` and `_link_supervisor` only caught `(CompanionError, OSError)`.
+  One DB hiccup killed the task forever: RF transmission stopped while
+  mesh -> Discord kept working, so the bridge looked healthy. Both loops now catch
+  `Exception`, log, and continue.
+- **`_amain` returned exit code 0 when the Discord client died**, so a supervisor
+  with `Restart=on-failure` never restarted a dead bridge. Now returns 1.
+- **Concurrent reconnects raced**: `CompanionClient.open()`/`close()` were
+  unserialised and both the sender loop and the supervisor can reconnect. A second
+  open orphaned the first read loop, whose `finally` then marked the *healthy* new
+  link dead — permanent reconnect churn plus a leaked socket. Fixed with a
+  lifecycle lock and a connection generation counter.
+- **A zero-length companion frame raised `IndexError`** in the read loop and tore
+  down a healthy link. `split_frames` now rejects it as a `CompanionError`.
+- **The packet cursor never recovered** if the repeater DB was rebuilt, restored or
+  truncated: `MAX(id)` drops below the cursor and the tail then returns nothing
+  forever, silently. Now detects the backwards jump, resets and logs.
+- **Failed transmissions were discarded.** A repeater restart ate the queued
+  Discord message. Adds bounded retry with backoff (`tx_retries`, default 3).
+- **The webhook cache was permanent**: a deleted webhook silenced that channel
+  forever. Now invalidated on `NotFound`/`Forbidden` and re-created once.
+- **`config.json` was written non-atomically** — a crash mid-write left truncated
+  JSON and the plugin could never start again. Now temp file + `fsync` + `os.replace`.
+- **One bad message aborted the rest of the batch** (cursor already advanced, so
+  the remainder was lost); per-message isolation added, and repeated DB errors are
+  rate-limited instead of logging every 2s.
+- **`start()` aborted on a repeater that was down at boot.** It now logs and lets
+  the supervisor reconnect, so mesh -> Discord works during a repeater outage.
+
+## Security
+
+- **`bool("false")` enabled transmission.** A config round-tripped through a UI
+  that stringifies booleans silently turned `discord_to_mesh` on. Booleans are now
+  parsed strictly and nonsense values raise `ConfigError`.
+- **Mesh text rendered as live Markdown** with embeds enabled, so a mesh node could
+  post masked links (`[click](https://evil)`) and attacker-chosen link previews.
+  Now escaped (`escape_markdown`, default on) with `suppress_embeds=True`.
+- **Webhook usernames were forgeable** — a mesh node could post as "Admin". Adds
+  optional `mesh_sender_marker` (e.g. `[mesh] `) so the label is visibly non-Discord.
+- **Unvalidated endpoint config**: `companion_port` (0/70000) and an empty
+  `companion_host` now fail at load with a named error rather than at runtime.
+- **Allowlist typos raised bare `ValueError`** with a traceback; now a `ConfigError`
+  naming the field and value.
+- **DB path was interpolated into a `file:` URI unescaped**, so a `?` or `#` in the
+  path opened the wrong file.
+- **`_post_mesh` caught only `discord.HTTPException`**, leaking other exceptions
+  into a fire-and-forget task ("Task exception was never retrieved").
+
+Tests: 105 -> 129, coverage 74%, `tests/test_review_findings.py` pins each finding.
+
 # 0.7.0 — public-release hardening (code review)
 
 Findings from a full review before publishing, and their fixes:

@@ -23,6 +23,7 @@ import hashlib
 import hmac
 import logging
 import sqlite3
+import urllib.parse
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
@@ -56,7 +57,9 @@ def open_read_only(db_path: str | Path) -> sqlite3.Connection:
     path = Path(db_path)
     if not path.exists():
         raise FileNotFoundError(f"repeater database not found: {path}")
-    uri = f"file:{path}?mode=ro"
+    # Quote the path: a '?' or '#' in it would otherwise be parsed as URI syntax
+    # and silently open the wrong file.
+    uri = "file:" + urllib.parse.quote(str(path)) + "?mode=ro"
     conn = sqlite3.connect(uri, uri=True, timeout=5.0)
     conn.row_factory = sqlite3.Row
     return conn
@@ -209,15 +212,51 @@ class PacketTailer:
             )
         return out
 
+    def _recover_cursor_if_rebuilt(self) -> bool:
+        """Reset the cursor if the packets table went backwards.
+
+        The cursor only ever advances. If the repeater DB is rebuilt, restored
+        from backup or the table truncated, MAX(id) drops below it and every
+        query then returns nothing — the bridge would silently stop relaying for
+        the life of the process.
+        """
+        conn = open_read_only(self.db_path)
+        try:
+            row = conn.execute("SELECT COALESCE(MAX(id), 0) AS m FROM packets").fetchone()
+        finally:
+            conn.close()
+        highest = int(row["m"])
+        if highest < self._cursor:
+            logger.warning(
+                "packets table went backwards (cursor %d, max id %d) — resetting cursor; "
+                "the database was probably rebuilt",
+                self._cursor, highest,
+            )
+            self._cursor = 0
+            return True
+        return False
+
     async def run(self, on_message: Callable[[MeshMessage], None], poll_interval: float) -> None:
         import asyncio
 
+        failures = 0
         while True:
             try:
-                for message in await asyncio.to_thread(self.fetch_new):
-                    on_message(message)
+                batch = await asyncio.to_thread(self.fetch_new)
+                if not batch:
+                    await asyncio.to_thread(self._recover_cursor_if_rebuilt)
+                for message in batch:
+                    try:
+                        on_message(message)
+                    except Exception:  # noqa: BLE001 - one message must not drop the batch
+                        logger.exception("handler failed for packet %s", message.packet_id)
+                failures = 0
             except FileNotFoundError:
                 logger.error("repeater database disappeared: %s", self.db_path)
             except Exception:  # noqa: BLE001 - never kill the tail loop
-                logger.exception("packet tail iteration failed")
+                failures += 1
+                # Log the first failure loudly, then every 60th, so a locked or
+                # broken DB cannot flood the log every poll interval.
+                if failures == 1 or failures % 60 == 0:
+                    logger.exception("packet tail iteration failed (%d consecutive)", failures)
             await asyncio.sleep(poll_interval)

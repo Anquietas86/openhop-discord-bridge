@@ -84,6 +84,21 @@ DOCS = {
         "flood; Discord rate-limits webhooks at about 5 posts per 2s.",
     ),
     "inbound_refill_seconds": ("float", "Seconds per token refill for inbound traffic, per channel."),
+    "tx_retries": (
+        "int",
+        "Retries for a failed transmission before the message is abandoned, so a "
+        "brief repeater restart does not silently eat a Discord message.",
+    ),
+    "escape_markdown": (
+        "bool",
+        "Escape markdown in mesh text. Mesh input is attacker-controlled, so "
+        "without this a node can render masked links and fake formatting.",
+    ),
+    "mesh_sender_marker": (
+        "str",
+        "Prefix added to webhook usernames (e.g. `[mesh] `) so a mesh node cannot "
+        "pass itself off as a Discord member. Empty by default.",
+    ),
     "max_concurrent_posts": (
         "int",
         "Cap on concurrent Discord posts, so a burst cannot spawn unlimited tasks.",

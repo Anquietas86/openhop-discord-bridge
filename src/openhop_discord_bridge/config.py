@@ -34,6 +34,9 @@ MANIFEST_DEFAULTS: Dict[str, Any] = {
     "max_concurrent_posts": 8,
     "rate_refill_seconds": 12.0,
     "echo_ttl_seconds": 120,
+    "tx_retries": 3,
+    "escape_markdown": True,
+    "mesh_sender_marker": "",
     "start_from_latest": True,
     "log_level": "INFO",
     "discord_autoprovision": False,
@@ -44,6 +47,52 @@ MANIFEST_DEFAULTS: Dict[str, Any] = {
 
 
 SENDER_MODES = ("display_name", "username", "none")
+
+
+def _as_bool(value, field: str, default: bool) -> bool:
+    """Strict boolean.
+
+    ``bool("false")`` is True, so a config round-tripped through a UI that
+    stringifies booleans would silently ENABLE transmission on a channel the
+    operator believed was disabled. Only real booleans (or literal "true"/"false")
+    are accepted.
+    """
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in (0, 1):
+        return bool(value)
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in ("true", "1", "yes", "on"):
+            return True
+        if lowered in ("false", "0", "no", "off", ""):
+            return False
+    raise ConfigError(f"{field} must be true or false, not {value!r}")
+
+
+def _as_int(value, field: str, default: int) -> int:
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        raise ConfigError(f"{field} must be an integer, not {value!r}") from None
+
+
+def _as_id_list(value, field: str) -> list:
+    if value is None:
+        return []
+    if not isinstance(value, (list, tuple)):
+        raise ConfigError(f"{field} must be a list of ids, not {type(value).__name__}")
+    out = []
+    for item in value:
+        try:
+            out.append(int(item))
+        except (TypeError, ValueError):
+            raise ConfigError(f"{field} contains a non-numeric id: {item!r}") from None
+    return out
 
 
 def _sender_mode(value) -> Optional[str]:
@@ -130,10 +179,10 @@ class ChannelMapping:
         return cls(
             mesh_channel=mesh,
             discord_channel_id=cid,
-            mesh_to_discord=bool(raw.get("mesh_to_discord", True)),
-            discord_to_mesh=bool(raw.get("discord_to_mesh", True)),
-            allowed_role_ids=[int(x) for x in raw.get("allowed_role_ids") or []],
-            allowed_user_ids=[int(x) for x in raw.get("allowed_user_ids") or []],
+            mesh_to_discord=_as_bool(raw.get("mesh_to_discord"), f"{mesh!r}.mesh_to_discord", True),
+            discord_to_mesh=_as_bool(raw.get("discord_to_mesh"), f"{mesh!r}.discord_to_mesh", True),
+            allowed_role_ids=_as_id_list(raw.get("allowed_role_ids"), f"{mesh!r}.allowed_role_ids"),
+            allowed_user_ids=_as_id_list(raw.get("allowed_user_ids"), f"{mesh!r}.allowed_user_ids"),
             prefix_template=raw.get("prefix_template"),
             discord_channel_name=raw.get("discord_channel_name"),
             sender_name=_sender_mode(raw.get("sender_name") or raw.get("discord_sender_name")),
@@ -178,6 +227,9 @@ class Config:
     max_concurrent_posts: int
     rate_refill_seconds: float
     echo_ttl_seconds: float
+    tx_retries: int
+    escape_markdown: bool
+    mesh_sender_marker: str
     start_from_latest: bool
     log_level: str
     discord_autoprovision: bool = False
@@ -274,14 +326,21 @@ def load_config(path: Optional[Path] = None) -> Config:
 
     sender_mode = _sender_mode(raw.get("discord_sender_name") or "display_name") or "display_name"
 
+    port = _as_int(raw.get("companion_port"), "companion_port", 5003)
+    if not 1 <= port <= 65535:
+        raise ConfigError(f"companion_port must be 1-65535, not {port}")
+    host = str(raw.get("companion_host") or "").strip()
+    if not host:
+        raise ConfigError("companion_host must not be empty")
+
     max_bytes = int(raw.get("max_mesh_bytes") or 128)
     if not 16 <= max_bytes <= 200:
         raise ConfigError("max_mesh_bytes must be between 16 and 200")
 
     return Config(
         discord_token=token,
-        companion_host=str(raw.get("companion_host") or "127.0.0.1"),
-        companion_port=int(raw.get("companion_port") or 5003),
+        companion_host=host,
+        companion_port=port,
         companion_app_name=str(raw.get("companion_app_name") or "discord-bridge"),
         repeater_db_path=str(
             raw.get("repeater_db_path") or "/var/lib/openhop_repeater/repeater.db"
@@ -301,10 +360,15 @@ def load_config(path: Optional[Path] = None) -> Config:
         max_concurrent_posts=max(1, int(raw.get("max_concurrent_posts") or 8)),
         rate_refill_seconds=max(0.0, float(raw.get("rate_refill_seconds") or 12.0)),
         echo_ttl_seconds=max(0.0, float(raw.get("echo_ttl_seconds") or 120)),
-        start_from_latest=bool(raw.get("start_from_latest", True)),
+        tx_retries=max(0, _as_int(raw.get("tx_retries"), "tx_retries", 3)),
+        escape_markdown=_as_bool(raw.get("escape_markdown"), "escape_markdown", True),
+        mesh_sender_marker=str(raw.get("mesh_sender_marker") or ""),
+        start_from_latest=_as_bool(raw.get("start_from_latest"), "start_from_latest", True),
         log_level=str(raw.get("log_level") or "INFO").upper(),
-        discord_autoprovision=bool(raw.get("discord_autoprovision", False)),
+        discord_autoprovision=_as_bool(raw.get("discord_autoprovision"), "discord_autoprovision", False),
         discord_category_name=str(raw.get("discord_category_name") or "\U0001f4ac | Meshcore"),
         discord_channel_prefix=str(raw.get("discord_channel_prefix") or ""),
-        discord_guild_id=(int(raw["discord_guild_id"]) if raw.get("discord_guild_id") else None),
+        discord_guild_id=(
+            _as_int(raw.get("discord_guild_id"), "discord_guild_id", 0) or None
+        ),
     )
