@@ -1,3 +1,18 @@
+# 0.2.4
+
+Two bugs found on the first real Discord -> mesh round trip:
+
+- **Webhook username rejected**: Discord refuses a webhook `username` containing
+  its own brand (`400 / 50035: Username cannot contain "discord"`). A companion
+  node named `VK5JPH Discord` therefore failed *every* post. Names are now
+  sanitised (`sanitise_webhook_username`), stripping the brand word and reserved
+  words rather than dropping the message.
+- **Echo guard never matched**: the node prepends `<node_name>: ` to what we send,
+  so the round trip text was never equal to the remembered payload and the bridge
+  tried to repost its own transmission. Comparison now also tests the text after
+  that prefix, which also survives renaming the companion.
+- 60 tests passing.
+
 # 0.2.3
 
 - **Companion link is now supervised.** After the repeater restarted, the plugin

@@ -15,6 +15,8 @@ from typing import Dict, Optional
 
 import discord
 
+from .policy import sanitise_webhook_username
+
 logger = logging.getLogger(__name__)
 
 MESH_SAFE_NEWLINES = " / "
@@ -77,7 +79,7 @@ class BridgeDiscord(discord.Client):
         hook = await self.webhook_for(channel)
         await hook.send(
             content=text,
-            username=author[:80] or "mesh",
+            username=sanitise_webhook_username(author),
             allowed_mentions=discord.AllowedMentions.none(),
             wait=False,
         )

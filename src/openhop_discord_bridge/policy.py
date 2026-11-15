@@ -13,6 +13,28 @@ from typing import Callable, Deque, Dict, Optional, Tuple
 
 ELLIPSIS = "\u2026"
 
+# Discord rejects webhook usernames containing its own brand names (400, code
+# 50035, "Username cannot contain \"discord\""), and reserves a couple of words.
+FORBIDDEN_USERNAME_PARTS = ("discord", "clyde")
+RESERVED_USERNAMES = {"everyone", "here", "mesh"}
+
+
+def sanitise_webhook_username(name: str, fallback: str = "mesh") -> str:
+    """Make a mesh sender name acceptable as a Discord webhook username.
+
+    A mesh node called "VK5JPH Discord" would otherwise fail every post with a
+    400, so the brand word is stripped rather than the message dropped.
+    """
+    out = name or ""
+    for bad in FORBIDDEN_USERNAME_PARTS:
+        while bad in out.lower():
+            index = out.lower().index(bad)
+            out = out[:index] + out[index + len(bad):]
+    out = " ".join(out.split()).strip(" -_|\u00b7:,")
+    if not out or out.lower() in RESERVED_USERNAMES:
+        return fallback
+    return out[:80]
+
 
 def truncate_mesh_text(prefix: str, body: str, max_bytes: int) -> str:
     """Fit ``prefix + body`` into ``max_bytes`` UTF-8 bytes.
@@ -81,6 +103,20 @@ class EchoGuard:
             self._entries.popitem(last=False)
 
     def is_echo(self, text: str) -> bool:
+        """True if this text is our own transmission coming back.
+
+        The node prepends "<node_name>: " to what we send, so the round trip is
+        never a literal match for the payload we remembered: compare the text
+        after that prefix too. Matching on the remainder also survives renaming
+        the companion, which a hardcoded prefix would not.
+        """
+        if self._matches(text):
+            return True
+        if ": " in text:
+            return self._matches(text.split(": ", 1)[1])
+        return False
+
+    def _matches(self, text: str) -> bool:
         sent_at = self._entries.get(text)
         if sent_at is None:
             return False

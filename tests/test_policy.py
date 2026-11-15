@@ -137,3 +137,33 @@ def test_payload_plus_node_prefix_stays_within_budget():
         payload = truncate_mesh_text("Josh: ", body, budget)
         total = len(("Discord Bridge: " + payload).encode())
         assert total <= 128, (total, payload[:40])
+
+
+def test_webhook_username_strips_discord_brand():
+    """Discord rejects webhook usernames containing its own name (400/50035)."""
+    from openhop_discord_bridge.policy import sanitise_webhook_username as s
+
+    assert s("VK5JPH Discord \U0001f916") == "VK5JPH \U0001f916"
+    assert s("discord") == "mesh"
+    assert s("Discord Bridge") == "Bridge"
+    assert s("clyde bot") == "bot"
+    assert s("VK5OG-T1000e") == "VK5OG-T1000e"  # ordinary names untouched
+
+
+def test_webhook_username_fallback_and_truncation():
+    from openhop_discord_bridge.policy import sanitise_webhook_username as s
+
+    assert s("") == "mesh"
+    assert s("   ") == "mesh"
+    assert s("everyone") == "mesh"
+    assert len(s("x" * 200)) == 80
+
+
+def test_echo_matches_after_node_name_prefix():
+    """The node prepends '<node_name>: ', so a literal match never happens."""
+    clock = FakeClock(1000.0)
+    guard = EchoGuard(ttl_seconds=60, clock=clock)
+    guard.remember("Josh Hagger: !test")
+    assert guard.is_echo("Josh Hagger: !test")
+    assert guard.is_echo("VK5JPH Discord \U0001f916: Josh Hagger: !test")
+    assert not guard.is_echo("Ranga: hello")
