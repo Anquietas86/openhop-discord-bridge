@@ -1,3 +1,15 @@
+# 0.2.2
+
+- Provisioned channels are created with **no permission overwrites**, inheriting
+  the category. The previous behaviour stamped a member overwrite for the bot on
+  each new channel, and a member overwrite on the child shadows the category's
+  member overwrite instead of merging with it — so a scoped "Manage Channels on
+  the category" grant stopped applying inside those channels, leaving channels the
+  bot could create but never delete. The bot role already holds View Channel,
+  Read Message History, Manage Webhooks and Send Messages, so inheritance is
+  sufficient.
+- 55 tests passing.
+
 # 0.2.1
 
 - Provisioning no longer aborts on the first refusal. A channel the bot cannot

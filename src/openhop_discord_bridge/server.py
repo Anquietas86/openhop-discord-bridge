@@ -144,20 +144,14 @@ class Bridge:
             )
             logger.info("created category %r", cfg.discord_category_name)
 
-        overwrites = {}
-        me = guild.me
-        if me is not None:
-            overwrites[me] = discord.PermissionOverwrite(
-                view_channel=True,
-                read_message_history=True,
-                manage_webhooks=True,
-                send_messages=True,
-            )
-        if guild.default_role is not None:
-            overwrites.setdefault(
-                guild.default_role,
-                discord.PermissionOverwrite(view_channel=True, read_message_history=True),
-            )
+        # Deliberately NO per-channel overwrites. A member overwrite on the child
+        # channel SHADOWS the category's member overwrite instead of adding to it,
+        # so granting the bot Manage Channels on the category (the tidy, scoped
+        # grant) stopped applying the moment we stamped our own overwrite on the
+        # channel — leaving channels the bot could create but never delete. The
+        # bot role already carries View Channel, Read Message History, Manage
+        # Webhooks and Send Messages, so inheriting the category is correct.
+        overwrites = None
 
         resolved = {}
         for mapping in cfg.channels:
