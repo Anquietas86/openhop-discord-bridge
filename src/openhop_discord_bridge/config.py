@@ -21,6 +21,7 @@ MANIFEST_DEFAULTS: Dict[str, Any] = {
     "repeater_db_path": "/var/lib/openhop_repeater/repeater.db",
     "channels": [],
     "poll_interval_seconds": 2.0,
+    "link_check_seconds": 15.0,
     "max_mesh_bytes": 128,
     "mesh_prefix_template": "{author}: ",
     "companion_node_name": "Discord Bridge",
@@ -121,6 +122,7 @@ class Config:
     repeater_db_path: str
     channels: List[ChannelMapping]
     poll_interval_seconds: float
+    link_check_seconds: float
     max_mesh_bytes: int
     mesh_prefix_template: str
     companion_node_name: str
@@ -236,6 +238,7 @@ def load_config(path: Optional[Path] = None) -> Config:
         ),
         channels=mappings,
         poll_interval_seconds=max(0.5, float(raw.get("poll_interval_seconds") or 2.0)),
+        link_check_seconds=max(5.0, float(raw.get("link_check_seconds") or 15.0)),
         max_mesh_bytes=max_bytes,
         mesh_prefix_template=str(raw.get("mesh_prefix_template") or "{author}: "),
         companion_node_name=str(raw.get("companion_node_name") or "Discord Bridge"),

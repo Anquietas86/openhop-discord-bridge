@@ -1,3 +1,13 @@
+# 0.2.3
+
+- **Companion link is now supervised.** After the repeater restarted, the plugin
+  kept a half-closed handle in `CLOSE-WAIT`: inbound kept working because it reads
+  the database, while every transmission would have failed. A periodic supervisor
+  (`link_check_seconds`, default 15) reconnects and re-provisions the channels.
+- `CompanionClient.connected` now keys off the read loop's EOF flag rather than
+  `is_closing()`, because a half-closed socket reports `is_closing() == False`.
+- 57 tests passing.
+
 # 0.2.2
 
 - Provisioned channels are created with **no permission overwrites**, inheriting

@@ -68,3 +68,23 @@ def test_error_code_mapping():
     frame = p.Frame(p.RESP_ERROR, bytes([6]))
     assert frame.is_error
     assert frame.error_text() == "illegal_arg"
+
+
+def test_client_is_not_connected_before_open():
+    client = p.CompanionClient("127.0.0.1", 5003)
+    assert client.connected is False
+
+
+def test_closed_event_makes_client_disconnected():
+    """A half-closed socket (CLOSE-WAIT) must not read as connected."""
+    import asyncio
+
+    async def scenario():
+        client = p.CompanionClient("127.0.0.1", 5003)
+        client._writer = type("W", (), {"is_closing": lambda self: False})()
+        assert client.connected is True
+        client._closed.set()  # what the read loop does on peer EOF
+        assert client.connected is False
+        await client.close()
+
+    asyncio.run(scenario())

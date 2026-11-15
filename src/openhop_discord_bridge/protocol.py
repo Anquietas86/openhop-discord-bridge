@@ -180,7 +180,16 @@ class CompanionClient:
     # ── lifecycle ──────────────────────────────────────────────────────
     @property
     def connected(self) -> bool:
-        return self._writer is not None and not self._writer.is_closing()
+        """False once the peer has closed, even if our handle has not caught up.
+
+        A half-closed socket sits in CLOSE-WAIT and ``is_closing()`` stays False,
+        so the read loop's EOF flag is the reliable signal.
+        """
+        return (
+            self._writer is not None
+            and not self._writer.is_closing()
+            and not self._closed.is_set()
+        )
 
     async def open(self, timeout: float = 10.0) -> None:
         self._reader, self._writer = await asyncio.wait_for(

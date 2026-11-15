@@ -95,6 +95,7 @@ class Bridge:
         intents = build_intents()
         self.discord = BridgeDiscord(self, intents=intents)
         self._sender_task = asyncio.create_task(self._sender_loop(), name="mesh-sender")
+        asyncio.create_task(self._link_supervisor(), name="link-supervisor")
 
         logger.info(
             "bridge starting: %d channel(s) %s -> companion %s:%s",
@@ -286,6 +287,28 @@ class Bridge:
             await message.add_reaction("\U0001f4e1")
         except discord.HTTPException:
             pass
+
+    async def _link_supervisor(self) -> None:
+        """Keep the companion socket alive across repeater restarts.
+
+        Without this the bridge holds a half-closed handle after the repeater
+        restarts: inbound keeps working (it reads the database) while every
+        transmission fails, which is the worst possible failure shape because the
+        bridge still looks healthy.
+        """
+        while True:
+            await asyncio.sleep(self.config.link_check_seconds)
+            if self.link.connected:
+                continue
+            logger.warning("companion link is down — reconnecting")
+            try:
+                await self.link.close()
+                await self.link.open()
+                await self.link.provision_channels(self._channel_keys())
+                logger.info("companion link restored on %s:%s",
+                            self.config.companion_host, self.config.companion_port)
+            except (CompanionError, OSError):
+                logger.warning("companion reconnect failed; will retry", exc_info=True)
 
     async def _sender_loop(self) -> None:
         while True:
