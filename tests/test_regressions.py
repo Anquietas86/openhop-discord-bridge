@@ -38,6 +38,21 @@ def test_build_intents_sets_message_content():
         _ = discord.Intents.default() | discord.Intents.message_content
 
 
+def test_discord_client_token_api():
+    """connect() takes no token; start() does. Using the wrong one is a TypeError.
+
+    Pinned because discord.py's signatures are easy to mix up and the failure
+    only appears at runtime, after the companion link is already up.
+    """
+    import inspect
+
+    discord = pytest.importorskip("discord")
+    connect_params = inspect.signature(discord.Client.connect).parameters
+    start_params = inspect.signature(discord.Client.start).parameters
+    assert "token" not in connect_params
+    assert "token" in start_params
+
+
 def test_valid_token_shape_accepted(tmp_path):
     cfg = load_config(write_cfg(tmp_path))
     assert cfg.discord_token == GOOD_TOKEN

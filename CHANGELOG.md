@@ -1,3 +1,12 @@
+# 0.1.2
+
+- Fix: `Client.connect()` is keyword-only and takes no token on discord.py 2.7,
+  so passing the token raised `TypeError` after the companion link was already
+  up. Login now goes through `Client.start(token)`.
+- Disabled Message Content intent is reported as an actionable error naming the
+  portal path, with exit code 3, instead of discord.py's raw gateway text.
+- Tests: 39 passing; a signature test pins the connect/start contract.
+
 # 0.1.1
 
 - Fix: `Intents.default() | Intents.message_content` raised

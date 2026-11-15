@@ -103,6 +103,12 @@ class Bridge:
             cfg.companion_port,
         )
 
+    async def start_discord(self) -> None:
+        """Log in and connect. ``connect()`` takes no token — ``start(token)`` does."""
+        if self.discord is None:
+            return
+        await self.discord.start(self.config.discord_token)
+
     async def stop(self) -> None:
         if self._sender_task is not None:
             self._sender_task.cancel()
@@ -198,7 +204,7 @@ class Bridge:
                 logger.exception("TX to %s failed", mesh_channel)
 
 
-async def _amain(config: Config) -> None:
+async def _amain(config: Config) -> int:
     bridge = Bridge(config)
     loop = asyncio.get_running_loop()
     stop = asyncio.Event()
@@ -214,15 +220,28 @@ async def _amain(config: Config) -> None:
 
     await bridge.start()
     waiter = asyncio.create_task(stop.wait(), name="shutdown-waiter")
-    discord_task = asyncio.create_task(bridge.discord.connect(config.discord_token, reconnect=True))
+    discord_task = asyncio.create_task(bridge.start_discord(), name="discord-client")
     done, _pending = await asyncio.wait(
         {waiter, discord_task}, return_when=asyncio.FIRST_COMPLETED
     )
     if discord_task in done and not discord_task.cancelled():
         exc = discord_task.exception()
         if exc is not None:
+            text = str(exc).lower()
+            if "privileged intents" in text or "disallowed intents" in text:
+                logger.error(
+                    "Discord refused the gateway: the MESSAGE CONTENT intent is "
+                    "disabled on the application. Enable it at "
+                    "https://discord.com/developers/applications -> your app -> "
+                    "Bot -> Privileged Gateway Intents -> Message Content Intent, "
+                    "then restart this plugin. Without it the bot connects but can "
+                    "never see message text, so there is nothing to bridge."
+                )
+                await bridge.stop()
+                return 3
             logger.error("Discord client stopped: %s", exc)
     await bridge.stop()
+    return 0
 
 
 def main() -> int:
@@ -238,7 +257,7 @@ def main() -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     try:
-        asyncio.run(_amain(config))
+        return asyncio.run(_amain(config))
     except KeyboardInterrupt:
         return 0
     except Exception:  # noqa: BLE001 - log, then let the supervisor restart us
