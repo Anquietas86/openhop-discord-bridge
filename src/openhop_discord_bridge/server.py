@@ -167,10 +167,24 @@ class Bridge:
             name = mapping.resolved_channel_name(cfg.discord_channel_prefix)
             existing = discord.utils.get(category.text_channels, name=name)
             if existing is None:
-                existing = await guild.create_text_channel(
-                    name, category=category, overwrites=overwrites, reason="MeshCore bridge setup"
-                )
-                logger.info("created #%s under %r", name, cfg.discord_category_name)
+                try:
+                    existing = await guild.create_text_channel(
+                        name, category=category, overwrites=overwrites,
+                        reason="MeshCore bridge setup",
+                    )
+                    logger.info("created #%s under %r", name, cfg.discord_category_name)
+                except discord.Forbidden:
+                    # One channel refused must not cost the rest: keep going and
+                    # report exactly which mapping is unprovisioned.
+                    logger.error(
+                        "cannot create #%s: the bot needs Manage Channels on the "
+                        "%r category. Mesh channel %r stays unmapped.",
+                        name, cfg.discord_category_name, mapping.mesh_channel,
+                    )
+                    continue
+                except discord.HTTPException:
+                    logger.exception("Discord refused to create #%s", name)
+                    continue
             mapping.discord_channel_id = existing.id
             resolved[mapping.mesh_channel] = existing.id
             logger.info("mapped mesh %r -> #%s (%s)", mapping.mesh_channel, existing.name, existing.id)

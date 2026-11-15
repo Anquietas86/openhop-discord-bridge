@@ -1,3 +1,11 @@
+# 0.2.1
+
+- Provisioning no longer aborts on the first refusal. A channel the bot cannot
+  create (typical cause: Manage Channels not granted on the category) is logged
+  with the exact category and mesh channel that stay unmapped, and the remaining
+  channels are still created and persisted.
+- 55 tests passing.
+
 # 0.2.0
 
 - **Auto-provisioning** (`discord_autoprovision`): on first ready the bot ensures
