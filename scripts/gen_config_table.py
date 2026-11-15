@@ -78,6 +78,16 @@ DOCS = {
     ),
     "rate_capacity": ("int", "Token-bucket burst per channel: how many Discord messages can go out back-to-back."),
     "rate_refill_seconds": ("float", "Seconds per token refill, per channel."),
+    "inbound_burst": (
+        "int",
+        "Mesh -> Discord burst per channel. A mesh flood must not become a Discord "
+        "flood; Discord rate-limits webhooks at about 5 posts per 2s.",
+    ),
+    "inbound_refill_seconds": ("float", "Seconds per token refill for inbound traffic, per channel."),
+    "max_concurrent_posts": (
+        "int",
+        "Cap on concurrent Discord posts, so a burst cannot spawn unlimited tasks.",
+    ),
     "echo_ttl_seconds": (
         "float",
         "How long a transmitted payload is remembered, so the bridge's own message "

@@ -29,6 +29,9 @@ MANIFEST_DEFAULTS: Dict[str, Any] = {
     "companion_node_name": "Discord Bridge",
     "webhook_name": "Mesh Bridge",
     "rate_capacity": 3,
+    "inbound_burst": 12,
+    "inbound_refill_seconds": 2.0,
+    "max_concurrent_posts": 8,
     "rate_refill_seconds": 12.0,
     "echo_ttl_seconds": 120,
     "start_from_latest": True,
@@ -170,6 +173,9 @@ class Config:
     companion_node_name: str
     webhook_name: str
     rate_capacity: int
+    inbound_burst: int
+    inbound_refill_seconds: float
+    max_concurrent_posts: int
     rate_refill_seconds: float
     echo_ttl_seconds: float
     start_from_latest: bool
@@ -285,11 +291,14 @@ def load_config(path: Optional[Path] = None) -> Config:
         link_check_seconds=max(5.0, float(raw.get("link_check_seconds") or 15.0)),
         max_mesh_bytes=max_bytes,
         mesh_prefix_template=str(raw.get("mesh_prefix_template") or "{author}: "),
-        discord_sender_name=str(raw.get("discord_sender_name") or "display_name").lower(),
+        discord_sender_name=sender_mode,
         discord_sender_name_max_chars=max(4, int(raw.get("discord_sender_name_max_chars") or 24)),
         companion_node_name=str(raw.get("companion_node_name") or "Discord Bridge"),
         webhook_name=str(raw.get("webhook_name") or "Mesh Bridge"),
         rate_capacity=max(1, int(raw.get("rate_capacity") or 3)),
+        inbound_burst=max(1, int(raw.get("inbound_burst") or 12)),
+        inbound_refill_seconds=max(0.0, float(raw.get("inbound_refill_seconds") or 2.0)),
+        max_concurrent_posts=max(1, int(raw.get("max_concurrent_posts") or 8)),
         rate_refill_seconds=max(0.0, float(raw.get("rate_refill_seconds") or 12.0)),
         echo_ttl_seconds=max(0.0, float(raw.get("echo_ttl_seconds") or 120)),
         start_from_latest=bool(raw.get("start_from_latest", True)),

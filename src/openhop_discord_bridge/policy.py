@@ -149,6 +149,46 @@ class EchoGuard:
         return True
 
 
+class PendingEcho:
+    """Recently transmitted payloads, awaiting the mesh to repeat them back.
+
+    Bounded and time-limited on purpose: most transmissions are never heard back
+    (the mesh may not repeat, or the packet is lost), so an unbounded mapping
+    would grow for the life of the process.
+    """
+
+    def __init__(
+        self,
+        ttl_seconds: float = 300.0,
+        max_entries: int = 200,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self.ttl_seconds = ttl_seconds
+        self.max_entries = max(1, max_entries)
+        self._clock = clock
+        self._items: "OrderedDict[str, tuple[Outbound, float]]" = OrderedDict()
+
+    def remember(self, key: str, item: "Outbound") -> None:
+        self._items[key] = (item, self._clock())
+        self._prune()
+
+    def take(self, key: str) -> "Outbound | None":
+        self._prune()
+        entry = self._items.pop(key, None)
+        return entry[0] if entry else None
+
+    def _prune(self) -> None:
+        now = self._clock()
+        while self._items:
+            key, (_item, stamped) = next(iter(self._items.items()))
+            if now - stamped <= self.ttl_seconds and len(self._items) <= self.max_entries:
+                break
+            self._items.pop(key, None)
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+
 class TokenBucket:
     """Per-key token bucket, used to keep Discord chatter off the air.
 

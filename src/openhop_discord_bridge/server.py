@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import signal
+import sqlite3
 import sys
 import time
 from typing import Dict, Optional
@@ -22,6 +23,7 @@ from .policy import (
     EchoGuard,
     Outbound,
     OutboundQueue,
+    PendingEcho,
     TokenBucket,
     mesh_sender_label,
     mesh_text_budget,
@@ -59,13 +61,32 @@ class Bridge:
         self.secrets: Dict[str, list] = {}
         self.discord: Optional[BridgeDiscord] = None
         self._ready_done = False
-        self._pending_echo: dict[str, Outbound] = {}
+        self._pending_echo = PendingEcho(
+            ttl_seconds=config.echo_ttl_seconds * 2, max_entries=200
+        )
+        # Inbound is attacker-controlled too: a mesh flood must not become a
+        # Discord flood (webhooks are limited to ~5 posts/2s) nor an unbounded
+        # number of concurrent tasks.
+        self.inbound = TokenBucket(
+            config.inbound_burst, config.inbound_refill_seconds
+        )
+        self._post_slots = asyncio.Semaphore(config.max_concurrent_posts)
+        self._inbound_dropped = 0
         self._sender_task: Optional[asyncio.Task] = None
 
     # ── mesh keys ──────────────────────────────────────────────────────
     def _channel_keys(self) -> Dict[str, bytes]:
         """16-byte AES keys for every mapped channel, in mapping order."""
-        self.secrets = load_channel_secrets(self.config.repeater_db_path)
+        try:
+            self.secrets = load_channel_secrets(self.config.repeater_db_path)
+        except (FileNotFoundError, sqlite3.Error) as exc:
+            raise ConfigError(
+                f"cannot read the repeater database at {self.config.repeater_db_path!r} "
+                f"({exc}). Set 'repeater_db_path' to the repeater's SQLite file; the "
+                "bridge needs read access to the packets and companion_channels tables."
+            ) from exc
+        return self._keys_from_secrets()
+    def _keys_from_secrets(self) -> Dict[str, bytes]:
         keys: Dict[str, bytes] = {}
         missing = []
         for mapping in self.config.channels:
@@ -253,8 +274,10 @@ class Bridge:
             self._sender_task.cancel()
             try:
                 await self._sender_task
-            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            except asyncio.CancelledError:
                 pass
+            except Exception:  # noqa: BLE001 - shutdown path
+                logger.debug("sender loop ended with an error during shutdown", exc_info=True)
         await self.link.close()
         if self.discord is not None and not self.discord.is_closed():
             await self.discord.close()
@@ -266,8 +289,8 @@ class Bridge:
             return
         if self.echo.is_echo(message.text):
             logger.debug("suppressed echo of our own transmission: %r", message.text[:40])
-            confirmed = self._pending_echo.pop(
-                message.text.split(": ", 1)[1] if ": " in message.text else message.text, None
+            confirmed = self._pending_echo.take(
+                message.text.split(": ", 1)[1] if ": " in message.text else message.text
             )
             if confirmed is not None:
                 logger.info("delivery confirmed on the mesh for %s", confirmed.mesh_channel)
@@ -276,17 +299,53 @@ class Bridge:
         text = message.text.strip()
         if not text:
             return
+        if not self.inbound.try_take(message.channel):
+            self._inbound_dropped += 1
+            # Log every message dropped in this window, but at most one warning
+            # per 50 so a flood cannot flood the log as well.
+            if self._inbound_dropped % 50 == 1:
+                logger.warning(
+                    "inbound throttle: dropping mesh traffic on %s (%d dropped so far)",
+                    message.channel, self._inbound_dropped,
+                )
+            return
         asyncio.create_task(self._post_mesh(message, mapping, text), name="mesh-post")
+
+    @staticmethod
+    def _split_sender(text: str) -> tuple[str, str]:
+        """Split "<sender>: body" into its parts, conservatively.
+
+        Group text is prefixed with the sending node's name, but a bridge (or a
+        malicious node) can inject arbitrary text. Requiring ": " and rejecting a
+        head that looks like a URL keeps "http://x" from being read as a sender
+        named "http".
+        """
+        head, sep, tail = text.partition(":")
+        if not sep:
+            return "mesh", text
+        # Only a separator when the body is empty or space-led: that keeps
+        # "http://host:8080/x" (tail begins "//") from inventing a sender, and
+        # still recognises "Someone:" as an empty message.
+        if tail and not tail.startswith(" "):
+            return "mesh", text
+        head = head.strip()
+        if not head or len(head) > 32 or "/" in head:
+            return "mesh", text
+        return head, tail.strip()
 
     async def _post_mesh(self, message: MeshMessage, mapping: ChannelMapping, text: str) -> None:
         if self.discord is None:
             return
-        author = text.split(":", 1)[0] if ":" in text[:32] else "mesh"
-        body = text.split(":", 1)[1].strip() if author != "mesh" else text
-        try:
-            await self.discord.post_mesh_message(mapping.discord_channel_id, author, body)
-        except discord.HTTPException:
-            logger.exception("Discord rejected a mesh message for %s", mapping.mesh_channel)
+        author, body = self._split_sender(text)
+        if not body:
+            # Discord rejects empty content with a 400; nothing useful to relay.
+            logger.info("skipping empty mesh message on %s", mapping.mesh_channel)
+            return
+        async with self._post_slots:
+            try:
+                await self.discord.post_mesh_message(mapping.discord_channel_id, author, body)
+            except discord.HTTPException:
+                logger.exception("Discord rejected a mesh message for %s", mapping.mesh_channel)
 
     # ── Discord -> mesh ────────────────────────────────────────────────
     async def handle_discord_message(self, message: discord.Message) -> None:
@@ -338,7 +397,7 @@ class Bridge:
         dropped = self.queue.put(item)
         if dropped is not None:
             logger.warning("outbound queue full; dropped a message for %s", dropped.mesh_channel)
-        self._pending_echo[payload] = item
+        self._pending_echo.remember(payload, item)
         await self._react(message, REACT_QUEUED)
 
     async def _react(self, ref, emoji: str) -> None:
@@ -346,7 +405,10 @@ class Bridge:
         if self.discord is None or ref is None:
             return
         try:
-            if isinstance(ref, discord.Message):
+            # Duck-typed on purpose: anything with add_reaction() works, and an
+            # isinstance(discord.Message) check silently ignores message-like
+            # objects (and made this path untestable without a gateway).
+            if hasattr(ref, "add_reaction") and hasattr(ref, "id"):
                 await ref.add_reaction(emoji)
                 return
             channel = self.discord.get_channel(getattr(ref, "discord_channel_id", None))

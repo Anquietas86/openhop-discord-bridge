@@ -1,3 +1,33 @@
+# 0.7.0 — public-release hardening (code review)
+
+Findings from a full review before publishing, and their fixes:
+
+- **Latent crash in `BridgeDiscord.__init__`**: `intents or (...)` treated an
+  empty `Intents()` as falsy and evaluated a fallback containing the broken
+  `Intents.default() | Intents.message_content` expression. Unreachable from
+  `server.py` (which always passes populated intents) but fatal for any other
+  caller.
+- **No inbound throttle** (DoS): a mesh flood became a Discord flood, and every
+  message spawned an unbounded `asyncio` task. Adds per-channel
+  `inbound_burst` / `inbound_refill_seconds` and `max_concurrent_posts`; drops are
+  counted and logged at most once per 50.
+- **Unbounded `_pending_echo`** (memory leak): entries were only removed when the
+  mesh echoed the transmission back. Now a bounded, TTL'd `PendingEcho`.
+- **Mis-split messages**: a body like `http://host:8080/x` was read as a sender
+  named `http`; `"Someone:"` was posted as literal text instead of being
+  recognised as empty. Splitting now requires an empty or space-led body and
+  rejects URL-like heads; empty bodies are skipped instead of provoking a `400`.
+- **`_react` ignored message-like objects** (`isinstance(discord.Message)`);
+  now duck-typed, which also made the reaction paths testable.
+- **Unclear failure when the repeater DB is missing**: now a `ConfigError`
+  naming `repeater_db_path` and what the bridge needs from it.
+- **`discord_sender_name` validation result was discarded** (ruff F841).
+- **Testing**: 105 tests (was 78), coverage 58% -> 74%, with adversarial suites
+  for allowlist bypass, `@everyone` in mesh text, floods, malformed packets and
+  the intake guard. Protocol client exercised against a fake frame server.
+- README gains a **Security model** section stating what is and is not
+  guaranteed.
+
 # 0.6.1
 
 - **README install path is now the web dashboard**, matching how it is actually

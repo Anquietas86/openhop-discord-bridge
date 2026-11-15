@@ -42,7 +42,9 @@ def flatten_for_mesh(text: str) -> str:
 
 class BridgeDiscord(discord.Client):
     def __init__(self, bridge, intents: Optional[discord.Intents] = None) -> None:
-        super().__init__(intents=intents or (discord.Intents.default() | discord.Intents.message_content))
+        # NOT `intents or ...`: an empty Intents() is falsy, so that idiom would
+        # silently evaluate the fallback for a caller who deliberately passed one.
+        super().__init__(intents=build_intents() if intents is None else intents)
         self.bridge = bridge
         self._webhooks: Dict[int, discord.Webhook] = {}
 
